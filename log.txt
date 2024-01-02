@@ -1,0 +1,15 @@
+jordalgo@jordalgo-Lenovo-YOGA-920-13IKB:~/repos/bpftrace$ sudo ./result/bin/bpftrace -e 'kprobe:nf_nat_ipv4_manip_pkt { printf("func called\n"); }'
+Attaching 1 probe...
+^C
+
+jordalgo@jordalgo-Lenovo-YOGA-920-13IKB:~/repos/bpftrace$ sudo ./result/bin/bpftrace -l | grep "nf_nat_ipv4"
+kprobe:nf_nat_ipv4_local_fn
+kprobe:nf_nat_ipv4_local_in
+kprobe:nf_nat_ipv4_manip_pkt
+kprobe:nf_nat_ipv4_out
+kprobe:nf_nat_ipv4_pre_routing
+kprobe:nf_nat_ipv4_register_fn
+kprobe:nf_nat_ipv4_unregister_fn
+jordalgo@jordalgo-Lenovo-YOGA-920-13IKB:~/repos/bpftrace$ uname -a
+Linux jordalgo-Lenovo-YOGA-920-13IKB 6.2.0-37-generic #38~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Nov  2 18:01:13 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+
