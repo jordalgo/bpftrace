@@ -443,8 +443,7 @@ public:
   }
   bool IsCastableMapTy() const
   {
-    return type_ == Type::count || type_ == Type::sum || type_ == Type::max ||
-           type_ == Type::min || type_ == Type::avg;
+    return type_ == Type::count || type_ == Type::sum || type_ == Type::avg;
   }
   bool IsMapIterableTy() const
   {
