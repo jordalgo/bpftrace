@@ -23,6 +23,8 @@ and this project adheres to
   - [#3401](https://github.com/bpftrace/bpftrace/pull/3401)
 - Allow tuples to be used as map keys
   - [#3390](https://github.com/bpftrace/bpftrace/pull/3390/)
+- Add `has_key` builtin for maps
+  - [#3358](https://github.com/bpftrace/bpftrace/pull/3358)
 #### Changed
 - Merge output into `stdout` when `-lv`
   - [#3383](https://github.com/bpftrace/bpftrace/pull/3383)

@@ -40,7 +40,7 @@ EXPECT openflags: 64
 AFTER ./testprogs/syscall openat
 
 NAME tracepoint arg casts in predicates
-RUN {{BPFTRACE}} -e 'tracepoint:syscalls:sys_enter_wait4 /args.ru/ { @ru[tid] = args.ru; } tracepoint:syscalls:sys_exit_wait4 /@ru[tid]/ { @++; exit(); }' -c ./testprogs/wait4_ru
+RUN {{BPFTRACE}} -e 'tracepoint:syscalls:sys_enter_wait4 /args.ru/ { @ru[tid] = args.ru; } tracepoint:syscalls:sys_exit_wait4 /has_key(@ru[tid])/ { @++; exit(); }' -c ./testprogs/wait4_ru
 EXPECT @: 1
 
 NAME variable string type resize

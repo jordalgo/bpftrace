@@ -300,3 +300,18 @@ NAME print large int
 PROG BEGIN { $a = 10223372036854775807; print(($a)); exit(); }
 EXPECT 10223372036854775807
 TIMEOUT 1
+
+NAME has_key exists
+PROG BEGIN { @a[1] = 0; if (has_key(@a, 1)) { printf("ok\n"); exit(); } }
+EXPECT ok
+TIMEOUT 1
+
+NAME has_key no_exists
+PROG BEGIN { @a[1] = 0; if (has_key(@a, 2)) { printf("ok\n"); exit(); } }
+EXPECT_NONE ok
+TIMEOUT 1
+
+NAME has_key complex tuple
+PROG BEGIN { @a[1, ("hello", (int8)5)] = 0; if (has_key(@a, (1, ("hello", 5)))) { printf("ok\n"); exit(); } }
+EXPECT ok
+TIMEOUT 1

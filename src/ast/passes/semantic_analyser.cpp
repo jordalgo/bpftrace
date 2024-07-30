@@ -548,7 +548,7 @@ namespace {
 bool skip_key_validation(const Call &call)
 {
   return call.func == "print" || call.func == "clear" || call.func == "zero" ||
-         call.func == "len";
+         call.func == "len" || call.func == "has_key";
 }
 } // namespace
 
@@ -768,6 +768,30 @@ void SemanticAnalyser::visit(Call &call)
       }
     }
     call.type = CreateNone();
+  } else if (call.func == "has_key") {
+    check_assignment(call, false, false, false);
+    if (check_varargs(call, 2, 2)) {
+      auto &arg0 = *call.vargs.at(0);
+      if (!arg0.is_map)
+        LOG(ERROR, arg0.loc, err_)
+            << "has_key() expects the first argument to be a map";
+
+      Map &map = static_cast<Map &>(arg0);
+      auto *mapkey = get_map_key_type(map);
+      if (mapkey) {
+        if (mapkey->IsNoneTy()) {
+          LOG(ERROR, arg0.loc, err_)
+              << "has_key() only accepts maps that have keys to iterate over";
+        } else {
+          auto &arg1 = *call.vargs.at(1);
+          SizedType new_key_type = create_key_type(arg1.type, arg1.loc);
+          update_key_type(*mapkey, new_key_type, map.ident, arg1.loc);
+        }
+      }
+      // Note: if the map key doesn't already exist after the final pass
+      // we'll get an error in the Map visitor about it being undefined.
+    }
+    call.type = CreateBool();
   } else if (call.func == "str") {
     if (check_varargs(call, 1, 2)) {
       auto *arg = call.vargs.at(0);
@@ -1589,7 +1613,24 @@ void SemanticAnalyser::visit(Map &map)
     new_key_type = create_key_type(map.key_expr->type, map.key_expr->loc);
   }
 
-  update_key_type(map, new_key_type);
+  if (!map.skip_key_validation) {
+    if (const auto &key = map_key_.find(map.ident); key != map_key_.end()) {
+      if (map.key_expr) {
+        update_key_type(key->second, new_key_type, map.ident, map.loc);
+      } else {
+        if (!key->second.IsNoneTy() && is_final_pass()) {
+          LOG(ERROR, map.loc, err_)
+              << "Argument mismatch for " << map.ident << ": "
+              << "trying to access with no arguments when map expects "
+                 "arguments: "
+                 "'"
+              << key->second << "'";
+        }
+      }
+    } else {
+      map_key_.insert({ map.ident, new_key_type });
+    }
+  }
 
   auto search_val = map_val_.find(map.ident);
   if (search_val != map_val_.end()) {
@@ -3552,60 +3593,45 @@ SizedType SemanticAnalyser::create_key_type(const SizedType &expr_type,
   return new_key_type;
 }
 
-void SemanticAnalyser::update_key_type(const Map &map,
-                                       const SizedType &new_key_type)
+void SemanticAnalyser::update_key_type(SizedType &current_key_type,
+                                       const SizedType &new_key_type,
+                                       const std::string &map_ident,
+                                       const location &loc)
 {
-  if (map.skip_key_validation) {
-    return;
-  }
-  if (const auto &key = map_key_.find(map.ident); key != map_key_.end()) {
-    if (map.key_expr) {
-      bool valid = true;
-      if (key->second.IsSameType(new_key_type)) {
-        if (key->second.IsStringTy() || key->second.IsTupleTy()) {
-          update_string_size(key->second, new_key_type);
-          if (key->second.IsTupleTy() && !new_key_type.FitsInto(key->second)) {
-            valid = false;
-          }
-        } else if (key->second.IsIntegerTy()) {
-          // This should always be true as map keys default to 64 bits
-          // but keep this here just in case we add larger ints and need to
-          // update the map int logic
-          if (!new_key_type.FitsInto(key->second)) {
-            valid = false;
-          }
-        } else if (!key->second.IsEqual(new_key_type)) {
-          valid = false;
-        }
-      } else {
+  bool valid = true;
+  if (current_key_type.IsSameType(new_key_type)) {
+    if (current_key_type.IsStringTy() || current_key_type.IsTupleTy()) {
+      update_string_size(current_key_type, new_key_type);
+      if (current_key_type.IsTupleTy() &&
+          !new_key_type.FitsInto(current_key_type)) {
         valid = false;
       }
-
-      if (is_final_pass() && !valid) {
-        if (key->second.IsNoneTy()) {
-          LOG(ERROR, map.loc, err_)
-              << "Argument mismatch for " << map.ident << ": "
-              << "trying to access with arguments: '" << new_key_type
-              << "' when map expects no arguments";
-        } else {
-          LOG(ERROR, map.loc, err_)
-              << "Argument mismatch for " << map.ident << ": "
-              << "trying to access with arguments: '" << new_key_type
-              << "' when map expects arguments: '" << key->second << "'";
-        }
+    } else if (current_key_type.IsIntegerTy()) {
+      // This should always be true as map keys default to 64 bits
+      // but keep this here just in case we add larger ints and need to
+      // update the map int logic
+      if (!new_key_type.FitsInto(current_key_type)) {
+        valid = false;
       }
-    } else {
-      if (!key->second.IsNoneTy() && is_final_pass()) {
-        LOG(ERROR, map.loc, err_)
-            << "Argument mismatch for " << map.ident << ": "
-            << "trying to access with no arguments when map expects arguments: "
-               "'"
-            << key->second << "'";
-      }
-      return;
+    } else if (!current_key_type.IsEqual(new_key_type)) {
+      valid = false;
     }
   } else {
-    map_key_.insert({ map.ident, new_key_type });
+    valid = false;
+  }
+
+  if (is_final_pass() && !valid) {
+    if (current_key_type.IsNoneTy()) {
+      LOG(ERROR, loc, err_)
+          << "Argument mismatch for " << map_ident << ": "
+          << "trying to access with arguments: '" << new_key_type
+          << "' when map expects no arguments";
+    } else {
+      LOG(ERROR, loc, err_)
+          << "Argument mismatch for " << map_ident << ": "
+          << "trying to access with arguments: '" << new_key_type
+          << "' when map expects arguments: '" << current_key_type << "'";
+    }
   }
 }
 

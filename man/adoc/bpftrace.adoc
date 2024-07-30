@@ -2369,6 +2369,10 @@ Functions that are marked *async* are asynchronous which can lead to unexpected 
 | Delete a single key from a map.
 | Sync
 
+| <<map-functions-has_key, `has_key(map m, mapkey k)`>>
+| Return true if the key exists in this map. Otherwise return false.
+| Sync
+
 | <<map-functions-hist, `hist(int64 n[, int k])`>>
 | Create a log2 histogram of n using buckets per power of 2, 0 <= k <= 5, defaults to 0.
 | Sync
@@ -2499,6 +2503,30 @@ kprobe:dummy {
   delete(@associative, (1,2)); // ok
   delete(@associative); // error
   delete(@associative, 1); // error
+}
+```
+
+[#map-functions-has_key]
+=== has_key
+
+.variants
+* `has_key(map m, mapkey k)`
+
+Return true if the key exists in this map.
+Otherwise return false.
+Error if called with a map that has no keys (aka scalar map).
+
+```
+kprobe:dummy {
+  @associative[1,2] = 1;
+  if (!has_key(@associative[1,3])) { // ok
+    print(("bye"));
+  }
+
+  @scalar = 1;
+  if (has_key(@scalar)) { // error
+    print(("hello"));
+  }
 }
 ```
 

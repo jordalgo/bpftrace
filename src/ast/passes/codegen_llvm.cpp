@@ -495,12 +495,12 @@ void CodegenLLVM::visit(Call &call)
 {
   if (call.func == "count") {
     Map &map = *call.map;
-    auto [key, scoped_key_deleter] = getMapKey(map);
+    auto [key, scoped_key_deleter] = getMapKey(map, map.key_expr);
     b_.CreateMapElemAdd(ctx_, map, key, b_.getInt64(1), call.loc);
     expr_ = nullptr;
   } else if (call.func == "sum") {
     Map &map = *call.map;
-    auto [key, scoped_key_deleter] = getMapKey(map);
+    auto [key, scoped_key_deleter] = getMapKey(map, map.key_expr);
     auto scoped_del = accept(call.vargs.front());
     // promote int to 64-bit
     expr_ = b_.CreateIntCast(expr_,
@@ -512,7 +512,7 @@ void CodegenLLVM::visit(Call &call)
     bool is_max = call.func == "max";
     Map &map = *call.map;
 
-    auto [key, scoped_key_deleter] = getMapKey(map);
+    auto [key, scoped_key_deleter] = getMapKey(map, map.key_expr);
 
     CallInst *lookup = b_.CreateMapLookup(map, key);
 
@@ -620,7 +620,7 @@ void CodegenLLVM::visit(Call &call)
   } else if (call.func == "avg" || call.func == "stats") {
     Map &map = *call.map;
 
-    auto [key, scoped_key_deleter] = getMapKey(map);
+    auto [key, scoped_key_deleter] = getMapKey(map, map.key_expr);
 
     CallInst *lookup = b_.CreateMapLookup(map, key);
 
@@ -759,7 +759,7 @@ void CodegenLLVM::visit(Call &call)
   } else if (call.func == "delete") {
     for (const auto &arg : call.vargs) {
       auto &map = static_cast<Map &>(*arg);
-      auto [key, scoped_key_deleter] = getMapKey(map);
+      auto [key, scoped_key_deleter] = getMapKey(map, map.key_expr);
       if (!is_bpf_map_clearable(map_types_[map.ident])) {
         // store zero instead of calling bpf_map_delete_elem()
         AllocaInst *val = b_.CreateAllocaBPF(map.type, map.ident + "_zero");
@@ -771,6 +771,51 @@ void CodegenLLVM::visit(Call &call)
       }
     }
     expr_ = nullptr;
+  } else if (call.func == "has_key") {
+    auto &arg = *call.vargs.at(0);
+    auto &map = static_cast<Map &>(arg);
+    auto [key, scoped_key_deleter] = getMapKey(map, call.vargs.at(1));
+
+    CallInst *lookup = b_.CreateMapLookup(map, key);
+
+    AllocaInst *has_key = b_.CreateAllocaBPF(b_.getInt8Ty(), "has_key");
+
+    Function *parent = b_.GetInsertBlock()->getParent();
+    BasicBlock *lookup_success_block = BasicBlock::Create(module_->getContext(),
+                                                          "lookup_success",
+                                                          parent);
+    BasicBlock *lookup_failure_block = BasicBlock::Create(module_->getContext(),
+                                                          "lookup_failure",
+                                                          parent);
+    BasicBlock *lookup_merge_block = BasicBlock::Create(module_->getContext(),
+                                                        "lookup_merge",
+                                                        parent);
+
+    Value *lookup_condition = b_.CreateICmpNE(
+        b_.CreateIntCast(lookup, b_.GET_PTR_TY(), true),
+        b_.GetNull(),
+        "lookup_cond");
+    b_.CreateCondBr(lookup_condition,
+                    lookup_success_block,
+                    lookup_failure_block);
+
+    b_.SetInsertPoint(lookup_success_block);
+
+    b_.CreateStore(b_.getInt8(1), has_key);
+
+    b_.CreateBr(lookup_merge_block);
+
+    b_.SetInsertPoint(lookup_failure_block);
+
+    b_.CreateStore(b_.getInt8(0), has_key);
+
+    b_.CreateBr(lookup_merge_block);
+
+    b_.SetInsertPoint(lookup_merge_block);
+
+    expr_ = b_.CreateLoad(b_.getInt8Ty(), has_key);
+
+    b_.CreateLifetimeEnd(has_key);
   } else if (call.func == "str") {
     uint64_t max_strlen = bpftrace_.config_.get(ConfigKeyInt::max_strlen);
     // Largest read we'll allow = our global string buffer size
@@ -1460,7 +1505,7 @@ void CodegenLLVM::visit(Offsetof &ofof)
 
 void CodegenLLVM::visit(Map &map)
 {
-  auto [key, scoped_key_deleter] = getMapKey(map);
+  auto [key, scoped_key_deleter] = getMapKey(map, map.key_expr);
 
   auto map_info = bpftrace_.resources.maps_info.find(map.ident);
   if (map_info == bpftrace_.resources.maps_info.end()) {
@@ -2317,7 +2362,7 @@ void CodegenLLVM::visit(AssignMapStatement &assignment)
 
   Value *val, *expr;
   expr = expr_;
-  auto [key, scoped_key_deleter] = getMapKey(map);
+  auto [key, scoped_key_deleter] = getMapKey(map, map.key_expr);
   auto &expr_type = assignment.expr->type;
   if (shouldBeInBpfMemoryAlready(expr_type)) {
     if (!expr_type.IsSameSizeRecursive(map.type)) {
@@ -2900,26 +2945,26 @@ int CodegenLLVM::getNextIndexForProbe()
 }
 
 std::tuple<Value *, CodegenLLVM::ScopedExprDeleter> CodegenLLVM::getMapKey(
-    Map &map)
+    Map &map,
+    Expression *key_expr)
 {
   Value *key;
   bool alloca_created_here = true;
-  if (map.key_expr) {
-    Expression *expr = map.key_expr;
-    auto scoped_del = accept(expr);
-    if (inBpfMemory(expr->type)) {
+  if (key_expr) {
+    auto scoped_del = accept(key_expr);
+    if (inBpfMemory(key_expr->type)) {
       auto &key_type = map.key_type;
-      if (!expr->type.IsSameSizeRecursive(key_type)) {
+      if (!key_expr->type.IsSameSizeRecursive(key_type)) {
         key = b_.CreateAllocaBPF(key_type, map.ident + "_key");
         b_.CreateMemsetBPF(key, b_.getInt8(0), key_type.GetSize());
-        if (expr->type.IsTupleTy()) {
-          createTupleCopy(expr->type, key_type, key, expr_);
-        } else if (expr->type.IsStringTy()) {
-          b_.CreateMemcpyBPF(key, expr_, expr->type.GetSize());
+        if (key_expr->type.IsTupleTy()) {
+          createTupleCopy(key_expr->type, key_type, key, expr_);
+        } else if (key_expr->type.IsStringTy()) {
+          b_.CreateMemcpyBPF(key, expr_, key_expr->type.GetSize());
         } else {
           LOG(BUG) << "Type size mismatch. Key Type Size: "
                    << key_type.GetSize()
-                   << " Expression Type Size: " << expr->type.GetSize();
+                   << " Expression Type Size: " << key_expr->type.GetSize();
         }
       } else {
         key = expr_;
@@ -2934,15 +2979,16 @@ std::tuple<Value *, CodegenLLVM::ScopedExprDeleter> CodegenLLVM::getMapKey(
       key = b_.CreateAllocaBPF(map.key_type, map.ident + "_key");
       // Integers are always stored as 64-bit in map keys
       b_.CreateStore(
-          b_.CreateIntCast(expr_, b_.getInt64Ty(), expr->type.IsSigned()), key);
+          b_.CreateIntCast(expr_, b_.getInt64Ty(), key_expr->type.IsSigned()),
+          key);
     } else {
-      key = b_.CreateAllocaBPF(expr->type, map.ident + "_key");
-      if (expr->type.IsArrayTy() || expr->type.IsRecordTy()) {
+      key = b_.CreateAllocaBPF(key_expr->type, map.ident + "_key");
+      if (key_expr->type.IsArrayTy() || key_expr->type.IsRecordTy()) {
         // We need to read the entire array/struct and save it
-        b_.CreateProbeRead(ctx_, key, expr->type, expr_, expr->loc);
+        b_.CreateProbeRead(ctx_, key, key_expr->type, expr_, key_expr->loc);
       } else {
         b_.CreateStore(
-            b_.CreateIntCast(expr_, b_.getInt64Ty(), expr->type.IsSigned()),
+            b_.CreateIntCast(expr_, b_.getInt64Ty(), key_expr->type.IsSigned()),
             b_.CreatePointerCast(key, expr_->getType()->getPointerTo()));
       }
     }
@@ -4090,7 +4136,7 @@ void CodegenLLVM::createIncDec(Unop &unop)
 
   if (unop.expr->is_map) {
     Map &map = static_cast<Map &>(*unop.expr);
-    auto [key, scoped_key_deleter] = getMapKey(map);
+    auto [key, scoped_key_deleter] = getMapKey(map, map.key_expr);
     Value *oldval = b_.CreateMapLookupElem(ctx_, map, key, unop.loc);
     AllocaInst *newval = b_.CreateAllocaBPF(map.type, map.ident + "_newval");
     if (is_increment)
