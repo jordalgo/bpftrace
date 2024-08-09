@@ -14,32 +14,29 @@ class BPFtrace;
 class MapKey {
 public:
   MapKey() = default;
-  explicit MapKey(std::vector<SizedType> &&args) : args_(std::move(args))
+  explicit MapKey(SizedType &&arg) : arg_(std::move(arg))
   {
   }
 
-  std::vector<SizedType> args_;
+  SizedType arg_;
 
   bool operator!=(const MapKey &k) const;
 
   size_t size() const;
-  std::string argument_type_list() const;
-  std::vector<std::string> argument_value_list(
-      BPFtrace &bpftrace,
-      const std::vector<uint8_t> &data) const;
-  std::string argument_value_list_str(BPFtrace &bpftrace,
-                                      const std::vector<uint8_t> &data) const;
-
-private:
+  std::string argument_type() const;
+  std::string argument_value_str(BPFtrace &bpftrace,
+                                 const std::vector<uint8_t> &data) const;
   static std::string argument_value(BPFtrace &bpftrace,
                                     const SizedType &arg,
-                                    const void *data);
+                                    const void *data,
+                                    bool is_top_level = false);
 
+private:
   friend class cereal::access;
   template <typename Archive>
   void serialize(Archive &archive)
   {
-    archive(args_);
+    archive(arg_);
   }
 };
 

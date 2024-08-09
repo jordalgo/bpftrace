@@ -12,6 +12,7 @@ aot.builtin.func_uprobe_elf_symtable
 aot.builtin.print args in kfunc
 # AOT shim needs to parse config and set up BPFTRACE_MAX_STRLEN
 aot.call.str_big_printf
+aot.call.buf_map_multikey
 aot.call.cgroup_path
 aot.call.cgroup_path printf
 aot.call.hist_10g
@@ -31,11 +32,13 @@ aot.call.strftime_as_map_key
 aot.call.strftime_as_map_value
 aot.call.ustack_elf_symtable
 aot.dwarf.uprobe inlined function
+aot.for.map delete
 aot.for.map multiple loops
 aot.for.map multiple probes
 aot.for.map nested vals
 aot.for.map one key
 aot.for.map strings
+aot.for.map two key elements
 aot.for.map two keys
 aot.for.variable context multiple
 aot.json-output.complex
@@ -73,8 +76,11 @@ aot.probe.uprobe_ignore_missing_probes
 aot.regression.kfunc double pointer array access
 aot.regression.kfunc double pointer dereference
 aot.tuples.basic tuple map
+aot.tuples.tuple map key
+aot.tuples.tuple map key same as assoc array
 aot.tuples.tuple print
 aot.tuples.tuple strftime type is packed
+aot.variable.map multi-key string type resize
 aot.variable.tuple string resize
 aot.dwarf.uprobe inlined function - func
 aot.dwarf.uprobe inlined function - probe

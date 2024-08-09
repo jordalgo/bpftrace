@@ -89,7 +89,7 @@ TEST(required_resources, round_trip_map_info)
           },
       .hist_bits_arg = 1,
     };
-    info.key.args_.push_back(CreateInt32());
+    info.key.arg_ = CreateInt32();
     RequiredResources r;
     r.maps_info.insert({ "mymap", info });
     r.save_state(serialized);
@@ -106,9 +106,8 @@ TEST(required_resources, round_trip_map_info)
     EXPECT_TRUE(map_info.value_type.IsInetTy());
     EXPECT_EQ(map_info.value_type.GetSize(), 3ul);
 
-    EXPECT_EQ(map_info.key.args_.size(), 1);
-    EXPECT_TRUE(map_info.key.args_[0].IsIntegerTy());
-    EXPECT_EQ(map_info.key.args_[0].GetSize(), 4);
+    EXPECT_TRUE(map_info.key.arg_.IsIntegerTy());
+    EXPECT_EQ(map_info.key.arg_.GetSize(), 4);
 
     // clang-tidy does not recognize ASSERT_*() terminates testcase
     // NOLINTBEGIN(bugprone-unchecked-optional-access)

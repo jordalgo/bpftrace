@@ -41,7 +41,7 @@ TEST(CollectNodes, indirect)
 
 TEST(CollectNodes, none)
 {
-  auto &map = *new Map{ "myvar", bpftrace::location{} };
+  auto &map = *new Map{ "myvar", {}, bpftrace::location{} };
   auto &unop = *new Unop{ Operator::INCREMENT, &map, bpftrace::location{} };
 
   CollectNodes<Variable> visitor;

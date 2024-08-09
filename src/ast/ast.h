@@ -229,22 +229,6 @@ private:
   Offsetof(const Offsetof &other) = default;
 };
 
-class Map : public Expression {
-public:
-  DEFINE_ACCEPT
-
-  explicit Map(const std::string &ident, location loc);
-  Map(const std::string &ident, ExpressionList &&vargs, location loc);
-
-  std::string ident;
-  MapKey key_type;
-  ExpressionList vargs;
-  bool skip_key_validation = false;
-
-private:
-  Map(const Map &other) = default;
-};
-
 class Variable : public Expression {
 public:
   DEFINE_ACCEPT
@@ -341,6 +325,21 @@ public:
 
 private:
   Tuple(const Tuple &other) = default;
+};
+
+class Map : public Expression {
+public:
+  DEFINE_ACCEPT
+
+  explicit Map(const std::string &ident, ExpressionList &&elems, location loc);
+
+  std::string ident;
+  MapKey key_type;
+  Tuple key;
+  bool skip_key_validation = false;
+
+private:
+  Map(const Map &other) = default;
 };
 
 class Statement : public Node {

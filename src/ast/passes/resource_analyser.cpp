@@ -196,7 +196,7 @@ void ResourceAnalyser::visit(Call &call)
           nonmap_headroom + arg.type.GetSize());
     } else {
       auto &map = static_cast<Map &>(arg);
-      if (map.vargs.size() > 0) {
+      if (map.key.elems.size() > 0) {
         resources_.non_map_print_args.push_back(map.type);
         resources_.max_fmtstring_args_size = std::max(
             resources_.max_fmtstring_args_size,

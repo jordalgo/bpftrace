@@ -407,14 +407,15 @@ TEST(semantic_analyser, consistent_map_keys)
 {
   test("BEGIN { @x = 0; @x; }");
   test("BEGIN { @x[1] = 0; @x[2]; }");
+  test("BEGIN { @x[1, 1] = 0; @x[(3, 4)]; }");
 
   test_error("BEGIN { @x = 0; @x[1]; }", R"(
-stdin:1:17-22: ERROR: Argument mismatch for @x: trying to access with arguments: [unsigned int64] when map expects arguments: []
+stdin:1:17-22: ERROR: Argument mismatch for @x: trying to access with arguments: (unsigned int64) when map expects no arguments
 BEGIN { @x = 0; @x[1]; }
                 ~~~~~
 )");
   test_error("BEGIN { @x[1] = 0; @x; }", R"(
-stdin:1:20-22: ERROR: Argument mismatch for @x: trying to access with arguments: [] when map expects arguments: [unsigned int64]
+stdin:1:20-22: ERROR: Argument mismatch for @x: trying to access with no arguments when map expects arguments: (unsigned int64)
 BEGIN { @x[1] = 0; @x; }
                    ~~
 )");
@@ -422,12 +423,12 @@ BEGIN { @x[1] = 0; @x; }
   test("BEGIN { @x[1,2] = 0; @x[3,4]; }");
 
   test_error("BEGIN { @x[1,2] = 0; @x[3]; }", R"(
-stdin:1:22-27: ERROR: Argument mismatch for @x: trying to access with arguments: [unsigned int64] when map expects arguments: [unsigned int64, unsigned int64]
+stdin:1:22-27: ERROR: Argument mismatch for @x: trying to access with arguments: (unsigned int64) when map expects arguments: (unsigned int64,unsigned int64)
 BEGIN { @x[1,2] = 0; @x[3]; }
                      ~~~~~
 )");
   test_error("BEGIN { @x[1] = 0; @x[2,3]; }", R"(
-stdin:1:20-27: ERROR: Argument mismatch for @x: trying to access with arguments: [unsigned int64, unsigned int64] when map expects arguments: [unsigned int64]
+stdin:1:20-27: ERROR: Argument mismatch for @x: trying to access with arguments: (unsigned int64,unsigned int64) when map expects arguments: (unsigned int64)
 BEGIN { @x[1] = 0; @x[2,3]; }
                    ~~~~~~~
 )");
@@ -440,7 +441,7 @@ BEGIN { @x[1] = 0; @x[2,3]; }
       @x["b", 2, kstack];
     })",
              R"(
-stdin:3:7-25: ERROR: Argument mismatch for @x: trying to access with arguments: [string[2], unsigned int64, kstack] when map expects arguments: [unsigned int64, string[2], kstack]
+stdin:3:7-25: ERROR: Argument mismatch for @x: trying to access with arguments: (string[2],unsigned int64,kstack) when map expects arguments: (unsigned int64,string[2],kstack)
       @x["b", 2, kstack];
       ~~~~~~~~~~~~~~~~~~
 )");
@@ -664,6 +665,9 @@ kprobe:f { $x = hist(1); }
 stdin:1:12-22: ERROR: hist() should be directly assigned to a map
 kprobe:f { @x[hist(1)] = 1; }
            ~~~~~~~~~~
+stdin:1:12-22: ERROR: hist() should be directly assigned to a map
+kprobe:f { @x[hist(1)] = 1; }
+           ~~~~~~~~~~
 )");
   test_error("kprobe:f { if(hist()) { 123 } }", R"(
 stdin:1:12-21: ERROR: hist() should be directly assigned to a map
@@ -730,6 +734,12 @@ kprobe:f { $x = lhist(); }
                 ~~~~~~~
 )");
   test_error("kprobe:f { @[lhist()] = 1; }", R"(
+stdin:1:12-21: ERROR: lhist() should be directly assigned to a map
+kprobe:f { @[lhist()] = 1; }
+           ~~~~~~~~~
+stdin:1:12-21: ERROR: lhist() requires 4 arguments (0 provided)
+kprobe:f { @[lhist()] = 1; }
+           ~~~~~~~~~
 stdin:1:12-21: ERROR: lhist() should be directly assigned to a map
 kprobe:f { @[lhist()] = 1; }
            ~~~~~~~~~
@@ -847,7 +857,7 @@ TEST(semantic_analyser, call_delete)
   test("kprobe:f { @x = 1; delete(@x) ? 0 : 1; }", 10);
 
   test_error("kprobe:f { @x = 1; @y[5] = 5; delete(@x, @y); }", R"(
-stdin:1:42-44: ERROR: Argument mismatch for @y: trying to access with arguments: [] when map expects arguments: [unsigned int64]
+stdin:1:42-44: ERROR: Argument mismatch for @y: trying to access with no arguments when map expects arguments: (unsigned int64)
 kprobe:f { @x = 1; @y[5] = 5; delete(@x, @y); }
                                          ~~
 )");
@@ -905,7 +915,7 @@ TEST(semantic_analyser, call_print_map_item)
   test(R"_(BEGIN { @x[1,2] = "asdf"; print((1, 2, @x[1,2])); })_");
 
   test_error("BEGIN { @x[1] = 1; print(@x[\"asdf\"]); }", R"(
-stdin:1:20-36: ERROR: Argument mismatch for @x: trying to access with arguments: [string[5]] when map expects arguments: [unsigned int64]
+stdin:1:20-36: ERROR: Argument mismatch for @x: trying to access with arguments: (string[5]) when map expects arguments: (unsigned int64)
 BEGIN { @x[1] = 1; print(@x["asdf"]); }
                    ~~~~~~~~~~~~~~~~
 )");
@@ -1564,7 +1574,7 @@ TEST(semantic_analyser, array_as_map_key)
       @x[((struct MyStruct *)0)->y] = 1;
     })",
              R"(
-stdin:4:7-37: ERROR: Argument mismatch for @x: trying to access with arguments: [int32[4]] when map expects arguments: [int32[2]]
+stdin:4:7-37: ERROR: Argument mismatch for @x: trying to access with arguments: (int32[4]) when map expects arguments: (int32[2])
       @x[((struct MyStruct *)0)->y] = 1;
       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 )");
@@ -2276,7 +2286,7 @@ TEST(semantic_analyser, struct_as_map_key)
         @x[*((struct B *)0)] = 1;
     })",
              R"(
-stdin:4:9-30: ERROR: Argument mismatch for @x: trying to access with arguments: [struct B] when map expects arguments: [struct A]
+stdin:4:9-30: ERROR: Argument mismatch for @x: trying to access with arguments: (struct B) when map expects arguments: (struct A)
         @x[*((struct B *)0)] = 1;
         ~~~~~~~~~~~~~~~~~~~~~
 )");
@@ -3250,8 +3260,7 @@ TEST(semantic_analyser, string_size)
        0);
   stmt = driver.ctx.root->probes.at(0)->stmts.at(0);
   map_assign = dynamic_cast<ast::AssignMapStatement *>(stmt);
-  ASSERT_TRUE(map_assign->map->key_type.args_.at(0).IsStringTy());
-  ASSERT_EQ(map_assign->map->key_type.args_.at(0).GetSize(), 6UL);
+  ASSERT_EQ(map_assign->map->key_type.arg_.GetSize(), 6UL);
 
   test(bpftrace,
        true,
@@ -3260,9 +3269,9 @@ TEST(semantic_analyser, string_size)
        0);
   stmt = driver.ctx.root->probes.at(0)->stmts.at(0);
   map_assign = dynamic_cast<ast::AssignMapStatement *>(stmt);
-  ASSERT_EQ(map_assign->map->key_type.size(), 14UL);
-  ASSERT_TRUE(map_assign->map->key_type.args_.at(0).IsStringTy());
-  ASSERT_EQ(map_assign->map->key_type.args_.at(0).GetSize(), 6UL);
+  ASSERT_EQ(map_assign->map->key_type.size(), 16UL);
+  ASSERT_TRUE(map_assign->map->key_type.arg_.IsTupleTy());
+  ASSERT_EQ(map_assign->map->key_type.arg_.GetSize(), 16UL);
 
   test(bpftrace,
        true,
@@ -3517,16 +3526,18 @@ Program
  BEGIN
   =
    map: @map :: [int64]
-    int: 0 :: [int64]
+    tuple:
+     int: 0 :: [int64]
    int: 1 :: [int64]
   for
    decl
-    variable: $kv :: [(unsigned int64,int64)]
+    variable: $kv :: [((unsigned int64),int64)]
    expr
     map: @map :: [int64]
+     tuple:
    stmts
     call: print
-     variable: $kv :: [(unsigned int64,int64)]
+     variable: $kv :: [((unsigned int64),int64)]
 )");
 }
 
@@ -3537,14 +3548,16 @@ Program
  BEGIN
   =
    map: @map :: [int64]
-    int: 0 :: [int64]
-    int: 0 :: [int64]
+    tuple:
+     int: 0 :: [int64]
+     int: 0 :: [int64]
    int: 1 :: [int64]
   for
    decl
     variable: $kv :: [((unsigned int64,unsigned int64),int64)]
    expr
     map: @map :: [int64]
+     tuple:
    stmts
     call: print
      variable: $kv :: [((unsigned int64,unsigned int64),int64)]

@@ -151,9 +151,7 @@ void Printer::visit(Map &map)
   out_ << indent << "map: " << map.ident << type(map.type) << std::endl;
 
   ++depth_;
-  for (Expression *expr : map.vargs) {
-    expr->accept(*this);
-  }
+  map.key.accept(*this);
   --depth_;
 }
 

@@ -35,6 +35,7 @@ public:
   DIType *GetType(const SizedType &stype);
   DIType *CreateTupleType(const SizedType &stype);
   DIType *CreateMapStructType(const SizedType &stype);
+  DIType *CreateByteArrayType(uint64_t num_bytes);
   DIType *createPointerMemberType(const std::string &name,
                                   uint64_t offset,
                                   DIType *type);
@@ -45,7 +46,7 @@ public:
   DIGlobalVariableExpression *createMapEntry(const std::string &name,
                                              libbpf::bpf_map_type map_type,
                                              uint64_t max_entries,
-                                             const MapKey &key,
+                                             DIType *key_type,
                                              const SizedType &value_type);
   DIGlobalVariableExpression *createGlobalInt64(std::string_view name);
 

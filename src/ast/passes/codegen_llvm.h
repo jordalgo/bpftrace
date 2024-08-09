@@ -90,6 +90,11 @@ public:
                            uint64_t max_entries,
                            const MapKey &key,
                            const SizedType &value_type);
+  void createMapDefinition(const std::string &name,
+                           libbpf::bpf_map_type map_type,
+                           uint64_t max_entries,
+                           DIType *key_type,
+                           const SizedType &value_type);
   AllocaInst *createTuple(
       const SizedType &tuple_type,
       const std::vector<std::pair<llvm::Value *, const location *>> &vals,

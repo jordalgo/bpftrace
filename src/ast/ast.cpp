@@ -112,17 +112,13 @@ Offsetof::Offsetof(Expression *expr, std::string &field, location loc)
 {
 }
 
-Map::Map(const std::string &ident, location loc) : Expression(loc), ident(ident)
+Map::Map(const std::string &ident, ExpressionList &&elems, location loc)
+    : Expression(loc), ident(ident), key(Tuple(std::move(elems), loc))
 {
   is_map = true;
-}
-
-Map::Map(const std::string &ident, ExpressionList &&vargs_, location loc)
-    : Expression(loc), ident(ident), vargs(std::move(vargs_))
-{
-  is_map = true;
-  for (auto *expr : vargs) {
-    expr->key_for_map = this;
+  key.key_for_map = this;
+  for (auto &elem : key.elems) {
+    elem->key_for_map = this;
   }
 }
 
@@ -181,6 +177,7 @@ Cast::Cast(SizedType cast_type, Expression *expr, location loc)
 Tuple::Tuple(ExpressionList &&elems, location loc)
     : Expression(loc), elems(std::move(elems))
 {
+  is_literal = true;
 }
 
 ExprStatement::ExprStatement(Expression *expr, location loc)

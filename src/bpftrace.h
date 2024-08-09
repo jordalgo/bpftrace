@@ -195,7 +195,7 @@ public:
   bool need_recursion_check_ = false;
 
   static void sort_by_key(
-      std::vector<SizedType> key_args,
+      SizedType arg,
       std::vector<std::pair<std::vector<uint8_t>, std::vector<uint8_t>>>
           &values_by_key);
 

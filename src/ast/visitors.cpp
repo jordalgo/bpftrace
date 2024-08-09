@@ -49,9 +49,7 @@ void Visitor::visit(Offsetof &ofof)
 
 void Visitor::visit(Map &map)
 {
-  for (Expression *expr : map.vargs) {
-    Visit(*expr);
-  }
+  Visit(map.key);
 }
 
 void Visitor::visit(Variable &var __attribute__((__unused__)))

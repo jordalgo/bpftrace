@@ -714,7 +714,7 @@ std::string TextOutput::map_key_to_str(BPFtrace &bpftrace,
                                        const std::vector<uint8_t> &key) const
 {
   const auto &map_key = bpftrace.resources.maps_info.at(map.name()).key;
-  return map.name() + map_key.argument_value_list_str(bpftrace, key);
+  return map.name() + map_key.argument_value_str(bpftrace, key);
 }
 
 void TextOutput::map_key_val(const SizedType &map_type,
@@ -1018,9 +1018,10 @@ std::string JsonOutput::map_key_to_str(BPFtrace &bpftrace,
                                        const std::vector<uint8_t> &key) const
 {
   const auto &map_key = bpftrace.resources.maps_info.at(map.name()).key;
-  std::vector<std::string> args = map_key.argument_value_list(bpftrace, key);
-  if (!args.empty()) {
-    return "\"" + json_escape(str_join(args, ",")) + "\"";
+  std::string arg = map_key.argument_value(
+      bpftrace, map_key.arg_, static_cast<const uint8_t *>(&key[0]), true);
+  if (!arg.empty()) {
+    return "\"" + json_escape(arg) + "\"";
   }
   return "";
 }

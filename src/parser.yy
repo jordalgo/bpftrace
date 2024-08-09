@@ -656,8 +656,12 @@ call:
                 ;
 
 map:
-                MAP               { $$ = driver.ctx.make_node<ast::Map>($1, @$); }
-        |       MAP "[" vargs "]" { $$ = driver.ctx.make_node<ast::Map>($1, std::move($3), @$); }
+                MAP               {
+                        $$ = driver.ctx.make_node<ast::Map>($1, ast::ExpressionList{}, @$);
+                }
+        |       MAP "[" vargs "]" {
+                        $$ = driver.ctx.make_node<ast::Map>($1, std::move($3), @$);
+                }
                 ;
 
 var:

@@ -10,55 +10,36 @@ namespace bpftrace {
 
 bool MapKey::operator!=(const MapKey &k) const
 {
-  return args_ != k.args_;
+  return arg_ != k.arg_;
 }
 
 size_t MapKey::size() const
 {
-  size_t size = 0;
-  for (auto &arg : args_)
-    size += arg.GetSize();
-  return size;
+  return arg_.GetSize();
 }
 
-std::string MapKey::argument_type_list() const
+std::string MapKey::argument_type() const
 {
   std::ostringstream list;
-  list << "[";
-  for (size_t i = 0; i < args_.size(); i++) {
-    if (i)
-      list << ", ";
-    list << args_[i];
-  }
-  list << "]";
+  list << "" << arg_ << "";
   return list.str();
 }
 
-std::vector<std::string> MapKey::argument_value_list(
-    BPFtrace &bpftrace,
-    const std::vector<uint8_t> &data) const
+std::string MapKey::argument_value_str(BPFtrace &bpftrace,
+                                       const std::vector<uint8_t> &data) const
 {
-  std::vector<std::string> list;
-  int offset = 0;
-  for (const SizedType &arg : args_) {
-    list.push_back(argument_value(bpftrace, arg, &data[offset]));
-    offset += arg.GetSize();
-  }
-  return list;
-}
-
-std::string MapKey::argument_value_list_str(
-    BPFtrace &bpftrace,
-    const std::vector<uint8_t> &data) const
-{
-  if (args_.empty())
+  if (arg_.GetSize() == 0)
     return "";
-  return "[" + str_join(argument_value_list(bpftrace, data), ", ") + "]";
+  return "[" +
+         argument_value(
+             bpftrace, arg_, static_cast<const uint8_t *>(&data[0]), true) +
+         "]";
 }
 
 std::string MapKey::argument_value(BPFtrace &bpftrace,
                                    const SizedType &arg,
-                                   const void *data)
+                                   const void *data,
+                                   bool is_top_level)
 {
   auto arg_data = static_cast<const uint8_t *>(data);
   std::ostringstream ptr;
@@ -147,6 +128,22 @@ std::string MapKey::argument_value(BPFtrace &bpftrace,
     case Type::mac_address: {
       auto p = static_cast<const uint8_t *>(data);
       return bpftrace.resolve_mac_address(p);
+    }
+    case Type::tuple: {
+      std::vector<std::string> elems;
+      for (auto &field : arg.GetFields()) {
+        elems.push_back(
+            argument_value(bpftrace,
+                           field.type,
+                           static_cast<const uint8_t *>(data) + field.offset));
+      }
+      if (is_top_level) {
+        return str_join(elems, ", ");
+      }
+      return "(" + str_join(elems, ", ") + ")";
+    }
+    case Type::none: {
+      return "";
     }
     default:
       LOG(BUG) << "invalid mapkey argument type";
