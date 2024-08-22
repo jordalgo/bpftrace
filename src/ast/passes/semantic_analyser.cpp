@@ -2619,6 +2619,25 @@ void SemanticAnalyser::visit(AssignVarStatement &assignment)
 
   auto &assignTy = assignment.expr->type;
 
+  if (!assignment.type.IsNoneTy()) {
+    if (!assignment.type.IsSameType(assignTy)) {
+      LOG(ERROR, assignment.loc, err_)
+          << "Type mismatch for " << var_ident << ": "
+          << "the type of the assignment '" << assignTy
+          << "' does not match the type of the declaration '" << assignment.type
+          << "'";
+      return;
+    } else if (assignment.type.IsIntegerTy()) {
+      // Adjust the integer sizes if we can
+    } else if (!assignTy.FitsInto(assignment.type)) {
+      LOG(ERROR, assignment.loc, err_)
+          << "Type mismatch for " << var_ident << ": "
+          << "the type of the assignment '" << assignTy
+          << "' is too large for the declaration '" << assignment.type << "'";
+      return;
+    }
+  }
+
   Node *var_scope = nullptr;
   for (auto scope : scope_stack_) {
     auto search = variable_val_[scope].find(var_ident);
@@ -2722,6 +2741,44 @@ void SemanticAnalyser::visit(AssignVarStatement &assignment)
 void SemanticAnalyser::visit(AssignConfigVarStatement &assignment)
 {
   Visit(assignment.expr);
+}
+
+void SemanticAnalyser::visit(VarDeclStatement &decl)
+{
+  std::string var_ident = decl.var->ident;
+  auto &assignTy = decl.type;
+  decl.var->type = assignTy;
+
+  // This should be the first time we're seeing this variable
+  bool var_found = false;
+  for (auto scope : scope_stack_) {
+    auto search = variable_val_[scope].find(var_ident);
+    if (search != variable_val_[scope].end()) {
+      if (!declared_variables_[scope].contains(var_ident)) {
+        LOG(ERROR, decl.loc, err_)
+            << "Variable declarations need to occur before variable usage or "
+               "assignment. Variable: "
+            << var_ident;
+        return;
+      }
+      var_found = true;
+      if ((search->second.IsStringTy() && assignTy.IsStringTy()) ||
+          (search->second.IsTupleTy() && assignTy.IsTupleTy())) {
+        update_string_size(search->second, assignTy);
+      } else if (!search->second.IsSameType(assignTy)) {
+        LOG(ERROR, decl.loc, err_)
+            << "Type mismatch for " << var_ident << ": "
+            << "trying to assign value of type '" << assignTy
+            << "' when variable already has a type '" << search->second << "'";
+        return;
+      }
+    }
+  }
+
+  if (!var_found) {
+    variable_val_[scope_stack_.back()].insert({ var_ident, decl.type });
+    declared_variables_[scope_stack_.back()].insert(var_ident);
+  }
 }
 
 void SemanticAnalyser::visit(Predicate &pred)

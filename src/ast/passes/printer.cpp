@@ -289,6 +289,11 @@ void Printer::visit(AssignConfigVarStatement &assignment)
   --depth_;
 }
 
+void Printer::visit(VarDeclStatement &decl)
+{
+  decl.var->accept(*this);
+}
+
 void Printer::visit(If &if_node)
 {
   std::string indent(depth_, ' ');

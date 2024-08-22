@@ -35,6 +35,7 @@ MAKE_ACCEPT(ExprStatement)
 MAKE_ACCEPT(AssignMapStatement)
 MAKE_ACCEPT(AssignVarStatement)
 MAKE_ACCEPT(AssignConfigVarStatement)
+MAKE_ACCEPT(VarDeclStatement)
 MAKE_ACCEPT(Predicate)
 MAKE_ACCEPT(AttachPoint)
 MAKE_ACCEPT(If)
@@ -201,6 +202,16 @@ AssignVarStatement::AssignVarStatement(Variable *var,
     : Statement(loc), var(var), expr(expr)
 {
   expr->var = var;
+  type = CreateNone();
+}
+
+AssignVarStatement::AssignVarStatement(Variable *var,
+                                       SizedType type,
+                                       Expression *expr,
+                                       location loc)
+    : Statement(loc), var(var), expr(expr), type(type)
+{
+  expr->var = var;
 }
 
 AssignConfigVarStatement::AssignConfigVarStatement(
@@ -208,6 +219,11 @@ AssignConfigVarStatement::AssignConfigVarStatement(
     Expression *expr,
     location loc)
     : Statement(loc), config_var(config_var), expr(expr)
+{
+}
+
+VarDeclStatement::VarDeclStatement(Variable *var, SizedType type, location loc)
+    : Statement(loc), var(var), type(type)
 {
 }
 

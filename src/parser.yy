@@ -149,7 +149,7 @@ void yyerror(bpftrace::Driver &driver, const char *s);
 %type <ast::Probe *> probe
 %type <std::pair<ast::ProbeList, ast::SubprogList>> probes_and_subprogs
 %type <ast::Config *> config
-%type <ast::Statement *> assign_stmt block_stmt expr_stmt if_stmt jump_stmt loop_stmt config_assign_stmt for_stmt
+%type <ast::Statement *> assign_stmt block_stmt expr_stmt if_stmt jump_stmt loop_stmt config_assign_stmt for_stmt var_decl_stmt
 %type <ast::StatementList> block block_or_if stmt_list config_block config_assign_stmt_list
 %type <SizedType> type int_type pointer_type struct_type
 %type <ast::Variable *> var
@@ -411,6 +411,7 @@ expr_stmt:
  * this avoids a r/r conflict
  */
         |       assign_stmt        { $$ = $1; }
+        |       var_decl_stmt      { $$ = $1; }
                 ;
 
 jump_stmt:
@@ -447,6 +448,7 @@ assign_stmt:
                   YYERROR;
                 }
         |       map ASSIGN expr      { $$ = driver.ctx.make_node<ast::AssignMapStatement>($1, $3, @$); }
+        |       var COLON type ASSIGN expr { $$ = driver.ctx.make_node<ast::AssignVarStatement>($1, $3, $5, @$); }
         |       var ASSIGN expr      { $$ = driver.ctx.make_node<ast::AssignVarStatement>($1, $3, @$); }
         |       map compound_op expr
                 {
@@ -458,6 +460,10 @@ assign_stmt:
                   auto b = driver.ctx.make_node<ast::Binop>($1, $2, $3, @2);
                   $$ = driver.ctx.make_node<ast::AssignVarStatement>($1, b, @$);
                 }
+        ;
+        
+var_decl_stmt:
+                var COLON type {  $$ = driver.ctx.make_node<ast::VarDeclStatement>($1, $3, @$); }
         ;
 
 primary_expr:

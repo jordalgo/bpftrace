@@ -120,6 +120,11 @@ void Visitor::visit(AssignConfigVarStatement &assignment)
   Visit(*assignment.expr);
 }
 
+void Visitor::visit(VarDeclStatement &decl)
+{
+  Visit(*decl.var);
+}
+
 void Visitor::visit(If &if_node)
 {
   Visit(*if_node.cond);

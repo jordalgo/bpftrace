@@ -2353,6 +2353,27 @@ void CodegenLLVM::visit(AssignVarStatement &assignment)
   }
 }
 
+void CodegenLLVM::visit(VarDeclStatement &decl)
+{
+  Variable &var = *decl.var;
+
+  if (variables_.find(var.ident) == variables_.end()) {
+    SizedType alloca_type = var.type;
+
+    // Arrays and structs need not to be copied when assigned to local variables
+    // since they are treated as read-only - it is sufficient to assign
+    // the pointer and do the memcpy/proberead later when necessary
+    if (var.type.IsArrayTy() || var.type.IsRecordTy()) {
+      auto &pointee_type = var.type.IsArrayTy() ? *var.type.GetElementTy()
+                                                : var.type;
+      alloca_type = CreatePointer(pointee_type, var.type.GetAS());
+    }
+
+    AllocaInst *val = b_.CreateAllocaBPFInit(alloca_type, var.ident);
+    variables_[var.ident] = VariableLLVM{ val, val->getAllocatedType() };
+  }
+}
+
 void CodegenLLVM::visit(If &if_node)
 {
   Function *parent = b_.GetInsertBlock()->getParent();

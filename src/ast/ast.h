@@ -389,9 +389,14 @@ public:
   AssignVarStatement(Variable *var,
                      Expression *expr,
                      location loc = location());
+  AssignVarStatement(Variable *var,
+                     SizedType type,
+                     Expression *expr,
+                     location loc = location());
 
   Variable *var = nullptr;
   Expression *expr = nullptr;
+  SizedType type;
 
 private:
   AssignVarStatement(const AssignVarStatement &other) = default;
@@ -410,6 +415,19 @@ public:
 
 private:
   AssignConfigVarStatement(const AssignConfigVarStatement &other) = default;
+};
+
+class VarDeclStatement : public Statement {
+public:
+  DEFINE_ACCEPT
+
+  VarDeclStatement(Variable *var, SizedType type, location loc = location());
+
+  Variable *var = nullptr;
+  SizedType type;
+
+private:
+  VarDeclStatement(const VarDeclStatement &other) = default;
 };
 
 class Block : public Statement {
