@@ -43,7 +43,6 @@ call     avg|buf|cat|cgroupid|clear|count|delete|exit|hist|join|kaddr|kptr|ksym|
 int_type        bool|(u)?int(8|16|32|64)
 builtin_type    void|(u)?(min|max|sum|count|avg|stats)_t|probe_t|username|lhist_t|hist_t|usym_t|ksym_t|timestamp|macaddr_t|cgroup_path_t|strerror_t|kstack_t|ustack_t
 sized_type      string|inet|buffer
-subprog         fn
 
 /* Don't add to this! Use builtin OR call not both */
 call_and_builtin kstack|ustack|nsecs
@@ -79,7 +78,6 @@ bpftrace|perf|raw       { return Parser::make_STACK_MODE(yytext, loc); }
 {builtin}               { return Parser::make_BUILTIN(yytext, loc); }
 {call}                  { return Parser::make_CALL(yytext, loc); }
 {call_and_builtin}      { return Parser::make_CALL_BUILTIN(yytext, loc); }
-{subprog}               { return Parser::make_SUBPROG(yytext, loc); }
 {int}|{hex}|{exponent}  {
                           try
                           {

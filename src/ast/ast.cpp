@@ -303,13 +303,11 @@ Subprog::Subprog(Diagnostics &d,
 Program::Program(Diagnostics &d,
                  const std::string &c_definitions,
                  Config *config,
-                 SubprogList &&functions,
                  ProbeList &&probes,
                  location loc)
     : Node(d, loc),
       c_definitions(c_definitions),
       config(config),
-      functions(std::move(functions)),
       probes(std::move(probes))
 {
 }

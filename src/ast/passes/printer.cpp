@@ -455,7 +455,6 @@ void Printer::visit(Program &program)
   --depth_;
 
   ++depth_;
-  visit(program.functions);
   visit(program.probes);
   --depth_;
 }

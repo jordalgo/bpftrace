@@ -104,7 +104,6 @@ void yyerror(bpftrace::Driver &driver, const char *s);
 %token <std::string> CALL_BUILTIN "call_builtin"
 %token <std::string> INT_TYPE "integer type"
 %token <std::string> BUILTIN_TYPE "builtin type"
-%token <std::string> SUBPROG "subprog"
 %token <std::string> SIZED_TYPE "sized type"
 %token <std::string> IDENT "identifier"
 %token <std::string> PATH "path"
@@ -143,15 +142,12 @@ void yyerror(bpftrace::Driver &driver, const char *s);
 %type <ast::Expression *> and_expr addi_expr primary_expr cast_expr conditional_expr equality_expr expr logical_and_expr muli_expr
 %type <ast::Expression *> logical_or_expr map_or_var or_expr postfix_expr relational_expr shift_expr tuple_access_expr unary_expr xor_expr
 %type <ast::ExpressionList> vargs
-%type <ast::Subprog *> subprog
-%type <ast::SubprogArg *> subprog_arg
-%type <ast::SubprogArgList> subprog_args
 %type <ast::Integer *> int
 %type <ast::Map *> map
 %type <ast::PositionalParameter *> param
 %type <ast::Predicate *> pred
 %type <ast::Probe *> probe
-%type <std::pair<ast::ProbeList, ast::SubprogList>> probes_and_subprogs
+%type <ast::ProbeList> probes
 %type <ast::Config *> config
 %type <ast::Statement *> assign_stmt block_stmt expr_stmt if_stmt jump_stmt loop_stmt config_assign_stmt for_stmt
 %type <ast::VarDeclStatement *> var_decl_stmt
@@ -181,8 +177,8 @@ void yyerror(bpftrace::Driver &driver, const char *s);
 %%
 
 program:
-                c_definitions config probes_and_subprogs END {
-                    driver.ctx.root = driver.ctx.make_node<ast::Program>($1, $2, std::move($3.second), std::move($3.first), @$);
+                c_definitions config probes END {
+                    driver.ctx.root = driver.ctx.make_node<ast::Program>($1, $2, std::move($3), @$);
                 }
                 ;
 
@@ -293,29 +289,9 @@ config_assign_stmt:
                 IDENT ASSIGN expr   { $$ = driver.ctx.make_node<ast::AssignConfigVarStatement>($1, $3, @2); }
                 ;
 
-subprog:
-                SUBPROG IDENT "(" subprog_args ")" ":" type block {
-                    $$ = driver.ctx.make_node<ast::Subprog>($2, $7, std::move($4), std::move($8), @$);
-                }
-        |       SUBPROG IDENT "(" ")" ":" type block {
-                    $$ = driver.ctx.make_node<ast::Subprog>($2, $6, ast::SubprogArgList(), std::move($7), @$);
-                }
-                ;
-
-subprog_args:
-                subprog_args "," subprog_arg { $$ = std::move($1); $$.push_back($3); }
-        |       subprog_arg                  { $$ = ast::SubprogArgList{$1}; }
-                ;
-
-subprog_arg:
-                VAR ":" type { $$ = driver.ctx.make_node<ast::SubprogArg>($1, $3, @$); }
-                ;
-
-probes_and_subprogs:
-                probes_and_subprogs probe   { $$ = std::move($1); $$.first.push_back($2); }
-        |       probes_and_subprogs subprog { $$ = std::move($1); $$.second.push_back($2); }
-        |       probe        { $$ = { ast::ProbeList{$1}, ast::SubprogList{}}; }
-        |       subprog      { $$ = { ast::ProbeList{}, ast::SubprogList{$1}}; }
+probes:
+                probes probe   { $$ = std::move($1); $$.push_back($2); }
+        |       probe        { $$ = { ast::ProbeList{$1} }; }
                 ;
 
 probe:
@@ -652,7 +628,6 @@ keyword:
         |       SIZEOF        { $$ = $1; }
         |       UNROLL        { $$ = $1; }
         |       WHILE         { $$ = $1; }
-        |       SUBPROG       { $$ = $1; }
         ;
 
 ident:

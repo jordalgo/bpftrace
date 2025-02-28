@@ -566,20 +566,17 @@ public:
 private:
   std::string name_;
 };
-using SubprogList = std::vector<Subprog *>;
 
 class Program : public Node {
 public:
   Program(Diagnostics &d,
           const std::string &c_definitions,
           Config *config,
-          SubprogList &&functions,
           ProbeList &&probes,
           location loc);
 
   std::string c_definitions;
   Config *config = nullptr;
-  SubprogList functions;
   ProbeList probes;
 };
 

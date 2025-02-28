@@ -209,7 +209,6 @@ public:
   }
   R visit(Program &program)
   {
-    visitImpl(program.functions);
     visitImpl(program.probes);
     visitAndReplace(&program.config);
     return default_value();

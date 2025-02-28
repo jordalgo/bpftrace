@@ -10,10 +10,6 @@ ReturnPathAnalyser::ReturnPathAnalyser(ASTContext &ctx, std::ostream &out)
 
 bool ReturnPathAnalyser::visit(Program &prog)
 {
-  for (Subprog *subprog : prog.functions) {
-    if (!visit(*subprog))
-      return false;
-  }
   return true;
 }
 

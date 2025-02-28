@@ -2970,8 +2970,6 @@ ScopedExpr CodegenLLVM::visit(Probe &probe)
 
 ScopedExpr CodegenLLVM::visit(Program &program)
 {
-  for (Subprog *subprog : program.functions)
-    visit(subprog);
   for (Probe *probe : program.probes)
     visit(probe);
   return ScopedExpr();
