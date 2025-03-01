@@ -10,7 +10,7 @@
 %define define_location_comparison
 %define parse.assert
 %define parse.trace
-%expect 5
+%expect 3
 
 %define parse.error verbose
 
@@ -102,9 +102,6 @@ void yyerror(bpftrace::Driver &driver, const char *s);
 %token <std::string> BUILTIN "builtin"
 %token <std::string> CALL "call"
 %token <std::string> CALL_BUILTIN "call_builtin"
-%token <std::string> INT_TYPE "integer type"
-%token <std::string> BUILTIN_TYPE "builtin type"
-%token <std::string> SIZED_TYPE "sized type"
 %token <std::string> IDENT "identifier"
 %token <std::string> PATH "path"
 %token <std::string> CPREPROC "preprocessor directive"
@@ -152,7 +149,7 @@ void yyerror(bpftrace::Driver &driver, const char *s);
 %type <ast::Statement *> assign_stmt block_stmt expr_stmt if_stmt jump_stmt loop_stmt config_assign_stmt for_stmt
 %type <ast::VarDeclStatement *> var_decl_stmt
 %type <ast::StatementList> block block_or_if stmt_list config_block config_assign_stmt_list
-%type <SizedType> type int_type pointer_type struct_type
+%type <SizedType> type pointer_type struct_type
 %type <ast::Variable *> var
 
 
@@ -190,75 +187,9 @@ c_definitions:
                 ;
 
 type:
-                int_type { $$ = $1; }
-        |       BUILTIN_TYPE {
-                    static std::unordered_map<std::string, SizedType> type_map = {
-                        {"void", CreateVoid()},
-                        {"min_t", CreateMin(true)},
-                        {"max_t", CreateMax(true)},
-                        {"sum_t", CreateSum(true)},
-                        {"count_t", CreateCount(true)},
-                        {"avg_t", CreateAvg(true)},
-                        {"stats_t", CreateStats(true)},
-                        {"umin_t", CreateMin(false)},
-                        {"umax_t", CreateMax(false)},
-                        {"usum_t", CreateSum(false)},
-                        {"ucount_t", CreateCount(false)},
-                        {"uavg_t", CreateAvg(false)},
-                        {"ustats_t", CreateStats(false)},
-                        {"timestamp", CreateTimestamp()},
-                        {"macaddr_t", CreateMacAddress()},
-                        {"cgroup_path_t", CreateCgroupPath()},
-                        {"strerror_t", CreateStrerror()},
-                    };
-                    $$ = type_map[$1];
-                }
-        |       SIZED_TYPE {
-                    if ($1 == "string") {
-                        $$ = CreateString(0);
-                    } else if ($1 == "inet") {
-                        $$ = CreateInet(0);
-                    } else if ($1 == "buffer") {
-                        $$ = CreateBuffer(0);
-                    }
-                }
-        |       SIZED_TYPE "[" INT "]" {
-                    if ($1 == "string") {
-                        $$ = CreateString($3);
-                    } else if ($1 == "inet") {
-                        $$ = CreateInet($3);
-                    } else if ($1 == "buffer") {
-                        $$ = CreateBuffer($3);
-                    }
-                }
-        |       int_type "[" INT "]" {
-                  $$ = CreateArray($3, $1);
-                }
-        |       struct_type "[" INT "]" {
-                  $$ = CreateArray($3, $1);
-                }
-        |       int_type "[" "]" {
-                  $$ = CreateArray(0, $1);
-                }
+                IDENT { $$ = CreateInt(64); }
         |       pointer_type { $$ = $1; }
         |       struct_type { $$ = $1; }
-                ;
-
-int_type:
-                INT_TYPE {
-                    static std::unordered_map<std::string, SizedType> type_map = {
-                        {"bool", CreateBool()},
-                        {"uint8", CreateUInt(8)},
-                        {"uint16", CreateUInt(16)},
-                        {"uint32", CreateUInt(32)},
-                        {"uint64", CreateUInt(64)},
-                        {"int8", CreateInt(8)},
-                        {"int16", CreateInt(16)},
-                        {"int32", CreateInt(32)},
-                        {"int64", CreateInt(64)},
-                    };
-                    $$ = type_map[$1];
-                }
                 ;
 
 pointer_type:
@@ -458,6 +389,7 @@ assign_stmt:
 var_decl_stmt:
                  LET var {  $$ = driver.ctx.make_node<ast::VarDeclStatement>($2, @$); }
         |        LET var COLON type {  $$ = driver.ctx.make_node<ast::VarDeclStatement>($2, $4, @$); }
+
         ;
 
 primary_expr:
@@ -467,7 +399,6 @@ primary_expr:
         |       STACK_MODE         { $$ = driver.ctx.make_node<ast::StackMode>($1, @$); }
         |       BUILTIN            { $$ = driver.ctx.make_node<ast::Builtin>($1, @$); }
         |       CALL_BUILTIN       { $$ = driver.ctx.make_node<ast::Builtin>($1, @$); }
-        |       LPAREN expr RPAREN { $$ = $2; }
         |       param              { $$ = $1; }
         |       map_or_var         { $$ = $1; }
         |       "(" vargs "," expr ")"
@@ -593,15 +524,10 @@ addi_expr:
 cast_expr:
                 unary_expr                                  { $$ = $1; }
         |       LPAREN type RPAREN cast_expr                { $$ = driver.ctx.make_node<ast::Cast>($2, $4, @1 + @3); }
-/* workaround for typedef types, see https://github.com/bpftrace/bpftrace/pull/2560#issuecomment-1521783935 */
-        |       LPAREN IDENT RPAREN cast_expr               { $$ = driver.ctx.make_node<ast::Cast>(ast::ident_to_record($2, 0), $4, @1 + @3); }
-        |       LPAREN IDENT "*" RPAREN cast_expr           { $$ = driver.ctx.make_node<ast::Cast>(ast::ident_to_record($2, 1), $5, @1 + @4); }
-        |       LPAREN IDENT "*" "*" RPAREN cast_expr       { $$ = driver.ctx.make_node<ast::Cast>(ast::ident_to_record($2, 2), $6, @1 + @5); }
                 ;
 
 sizeof_expr:
                 SIZEOF "(" type ")"                         { $$ = driver.ctx.make_node<ast::Sizeof>($3, @$); }
-        |       SIZEOF "(" expr ")"                         { $$ = driver.ctx.make_node<ast::Sizeof>($3, @$); }
                 ;
 
 offsetof_expr:
@@ -633,7 +559,6 @@ keyword:
 ident:
                 IDENT         { $$ = $1; }
         |       BUILTIN       { $$ = $1; }
-        |       BUILTIN_TYPE  { $$ = $1; }
         |       CALL          { $$ = $1; }
         |       CALL_BUILTIN  { $$ = $1; }
         |       STACK_MODE    { $$ = $1; }
