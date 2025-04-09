@@ -345,7 +345,7 @@ Subprog::Subprog(Diagnostics &d,
 Macro::Macro(Diagnostics &d,
              std::string name,
              ExpressionList &&args,
-             Expression *expr,
+             Block *expr,
              Location &&loc)
     : Node(d, std::move(loc)),
       name(std::move(name)),

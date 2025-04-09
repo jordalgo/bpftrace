@@ -14,22 +14,29 @@ namespace bpftrace::ast {
 // Specialies a macro body for its call site.
 class MacroSpecializer : public Visitor<MacroSpecializer> {
 public:
-  MacroSpecializer(ASTContext &ast);
+  MacroSpecializer(ASTContext &ast, const std::string &macro_name);
 
   using Visitor<MacroSpecializer>::visit;
-  void visit(AssignVarStatement &assignment);
   void visit(VarDeclStatement &statement);
-  void visit(Variable &var);
   void visit(Map &map);
+  
+  using Visitor<MacroSpecializer>::replace;
+  AssignVarStatement *replace(AssignVarStatement* assignment, void *ret);
+  Variable *replace(Variable *var, void *ret);
+  Binop *replace(Binop *binop, void *ret);
 
   Expression *specialize(Macro &macro, const Call &call);
 
 private:
   ASTContext &ast_;
+  std::string macro_name_;
+  
+  std::string make_var_literal_ident(std::string original_ident);
 
   // Maps of macro map/var names -> callsite map/var names
   std::unordered_map<std::string, std::string> maps_;
   std::unordered_map<std::string, std::string> vars_;
+  std::unordered_map<std::string, std::string> literals_;
 };
 
 // Expands macros into their call sites.
@@ -49,18 +56,7 @@ private:
   std::unordered_set<std::string> called_;
 };
 
-MacroSpecializer::MacroSpecializer(ASTContext &ast) : ast_(ast)
-{
-}
-
-// This can only occur in a block expression
-void MacroSpecializer::visit(AssignVarStatement &assignment)
-{
-  std::string ident = assignment.var->ident;
-  vars_[ident] = ident;
-
-  Visitor<MacroSpecializer>::visit(assignment);
-}
+MacroSpecializer::MacroSpecializer(ASTContext &ast, const std::string &macro_name) : ast_(ast), macro_name_(macro_name) {}
 
 void MacroSpecializer::visit(VarDeclStatement &statement)
 {
@@ -70,14 +66,37 @@ void MacroSpecializer::visit(VarDeclStatement &statement)
   Visitor<MacroSpecializer>::visit(statement);
 }
 
-void MacroSpecializer::visit(Variable &var)
+AssignVarStatement *MacroSpecializer::replace(AssignVarStatement* assignment, [[maybe_unused]] void *ret)
 {
-  if (auto it = vars_.find(var.ident); it != vars_.end()) {
-    var.ident = it->second;
-  } else {
-    var.addError() << "Unhygienic access to variable";
-  }
+  std::cout << "assignvar \n";
+  return ast_.make_node<AssignVarStatement>(replace(assignment->var, nullptr), replace(assignment->expr, nullptr), Location(assignment->loc));
 }
+
+Variable *MacroSpecializer::replace(Variable *var, [[maybe_unused]] void *ret)
+{
+  std::cout << "variable \n";
+  if (auto it = vars_.find(var->ident); it != vars_.end()) {
+    return ast_.make_node<Variable>(it->second, Location(var->loc));
+  } else if (auto it = literals_.find(var->ident); it != literals_.end()) {
+    return ast_.make_node<Variable>(make_var_literal_ident(var->ident), Location(var->loc));
+  }
+  return var;
+}
+
+Binop *MacroSpecializer::replace(Binop *binop, [[maybe_unused]] void *ret)
+{
+  std::cout << "binop \n";
+  return ast_.make_node<Binop>(replace(binop->left, nullptr), binop->op, replace(binop->right, nullptr), Location(binop->loc));
+}
+
+// void MacroSpecializer::visit(Variable &var)
+// {
+//   if (auto it = vars_.find(var.ident); it != vars_.end()) {
+//     var.ident = it->second;
+//   } else if (auto it = literals_.find(var.ident); it == literals_.end()) {
+//     var.addError() << "Unhygienic access to variable";
+//   }
+// }
 
 void MacroSpecializer::visit(Map &map)
 {
@@ -86,6 +105,10 @@ void MacroSpecializer::visit(Map &map)
   } else {
     map.addError() << "Unhygienic access to map";
   }
+}
+
+std::string MacroSpecializer::make_var_literal_ident(std::string original_ident) {
+  return "$$" + macro_name_ + "_" + original_ident;
 }
 
 Expression *MacroSpecializer::specialize(Macro &macro, const Call &call)
@@ -98,6 +121,8 @@ Expression *MacroSpecializer::specialize(Macro &macro, const Call &call)
                     << macro.args.size() << "!=" << call.vargs.size();
     return nullptr;
   }
+  
+  StatementList stmt_list;
 
   for (size_t i = 0; i < call.vargs.size(); i++) {
     Expression *marg = macro.args[i];
@@ -115,15 +140,29 @@ Expression *MacroSpecializer::specialize(Macro &macro, const Call &call)
       } else {
         call.addError() << "Mismatched arg=" << i << " to macro call";
       }
+    } else if (carg->is_literal) {
+      if (auto *mvar = dynamic_cast<Variable *>(marg)) {
+        auto literal_ident = make_var_literal_ident(mvar->ident);
+        literals_[mvar->ident] = literal_ident;
+        stmt_list.push_back(ast_.make_node<AssignVarStatement>(ast_.make_node<Variable>(literal_ident, Location(call.loc)), carg, Location(call.loc)));
+      } else if (dynamic_cast<Map *>(marg) != nullptr) {
+        call.addError() << "Trying to pass a literal when macro expects a map argument";
+      }
     } else {
-      LOG(BUG) << "Parser let in a non-var and non-map macro argument";
+      call.addError() << "Arguments to macros must be variables, maps, or literals.";
     }
   }
+  
+  for (const auto expr : macro.expr->stmts) {
+    stmt_list.push_back(replace(expr, nullptr));
+  }
+  
+  auto cloned_block = ast_.make_node<Block>(std::move(stmt_list), replace(macro.expr->expr, nullptr), Location(macro.loc));
 
   // TODO: clone the macro body
-  visit(macro.expr);
+  visit(cloned_block);
 
-  return ast_.diagnostics().ok() ? macro.expr : nullptr;
+  return ast_.diagnostics().ok() ? cloned_block : nullptr;
 }
 
 MacroExpansion::MacroExpansion(ASTContext &ast, BPFtrace &b)
@@ -153,16 +192,28 @@ void MacroExpansion::run()
 Expression *MacroExpansion::replace(Call *call, [[maybe_unused]] void *ret)
 {
   if (auto it = macros_.find(call->func); it != macros_.end()) {
-    if (called_.contains(call->func)) {
-      call->addError() << "The PoC can only handle a single call of: "
-                       << call->func;
-      return nullptr;
-    } else {
-      called_.insert(call->func);
-    }
+    // bool has_bad_args = false;
+    // for (size_t i = 0; i < call->vargs.size(); ++i) {
+    //   auto *expr = call->vargs[i];
+    //   if (dynamic_cast<Map *>(expr) == nullptr && dynamic_cast<Variable *>(expr) == nullptr) {
+    //     call->addError() << "Arguments to macros must be variables or maps.";
+    //     has_bad_args = true;
+    //   }
+    // }
+    
+    // if (has_bad_args)
+    //   return nullptr;
+    
+    // if (called_.contains(call->func)) {
+    //   call->addError() << "The PoC can only handle a single call of: "
+    //                    << call->func;
+    //   return nullptr;
+    // } else {
+    //   called_.insert(call->func);
+    // }
 
     Macro *macro = it->second;
-    Expression *expr = MacroSpecializer(ast_).specialize(*macro, *call);
+    Expression *expr = MacroSpecializer(ast_, macro->name).specialize(*macro, *call);
     if (expr) {
       return expr;
     } else {

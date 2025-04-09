@@ -613,12 +613,12 @@ public:
   Macro(Diagnostics &d,
         std::string name,
         ExpressionList &&args,
-        Expression *expr,
+        Block *expr,
         Location &&loc);
 
   std::string name;
   ExpressionList args;
-  Expression *expr;
+  Block *expr;
 };
 using MacroList = std::vector<Macro *>;
 
