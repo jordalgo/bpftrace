@@ -17,6 +17,12 @@ class BPFtrace;
 class BpfProgram {
 public:
   explicit BpfProgram(struct bpf_program *bpf_prog);
+  ~BpfProgram()
+  {
+    if (attach_fd_ >= 0) {
+      close(attach_fd_);
+    }
+  }
 
   void set_prog_type(const Probe &probe);
   void set_expected_attach_type(const Probe &probe, BPFfeature &feature);
@@ -35,6 +41,8 @@ public:
 
 private:
   struct bpf_program *bpf_prog_;
+  // This fd is specifically for attaching to other running BPF programs.
+  int attach_fd_ = -1;
 };
 
 } // namespace bpftrace
