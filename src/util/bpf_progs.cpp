@@ -11,6 +11,7 @@
 #include <bpf/btf.h>
 #pragma GCC diagnostic pop
 #include "scopeguard.h"
+#include "util/fd.h"
 
 namespace bpftrace::util {
 
@@ -57,21 +58,11 @@ std::string get_prog_full_name(const struct bpf_prog_info *prog_info,
   return name;
 }
 
-int get_fd_for_bpf_prog(const std::string &bpf_prog_name)
+FD get_fd_for_bpf_prog(const std::string &bpf_prog_name)
 {
   __u32 id = 0;
   while (bpf_prog_get_next_id(id, &id) == 0) {
-    int fd = bpf_prog_get_fd_by_id(id);
-    // Don't close the fd if we return it;
-    // it needs to stay alive until after program attaching/loading
-    bool close_fd = true;
-
-    SCOPE_EXIT
-    {
-      if (close_fd && fd >= 0) {
-        close(fd);
-      }
-    };
+    auto fd = FD(bpf_prog_get_fd_by_id(id));
 
     if (fd < 0) {
       LOG(V1) << "Error getting FD for BPF program ID " << id;
@@ -87,7 +78,6 @@ int get_fd_for_bpf_prog(const std::string &bpf_prog_name)
     }
 
     if (get_prog_full_name(&info, fd) == bpf_prog_name) {
-      close_fd = false;
       return fd;
     }
 
@@ -136,13 +126,12 @@ int get_fd_for_bpf_prog(const std::string &bpf_prog_name)
 
       const char *func_name = btf__name_by_offset(btf, t->name_off);
       if (std::string(func_name) == bpf_prog_name) {
-        close_fd = false;
         return fd;
       }
     }
   }
 
-  return -1;
+  return FD(-1);
 }
 
 std::unordered_set<std::string> get_bpf_program_symbols()
@@ -150,16 +139,11 @@ std::unordered_set<std::string> get_bpf_program_symbols()
   std::unordered_set<std::string> symbols;
   __u32 id = 0;
   while (bpf_prog_get_next_id(id, &id) == 0) {
-    int fd = bpf_prog_get_fd_by_id(id);
+    auto fd = FD(bpf_prog_get_fd_by_id(id));
 
     if (fd < 0) {
       continue;
     }
-
-    SCOPE_EXIT
-    {
-      close(fd);
-    };
 
     struct bpf_prog_info info = {};
     __u32 info_len = sizeof(info);

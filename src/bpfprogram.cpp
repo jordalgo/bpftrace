@@ -87,7 +87,7 @@ void BpfProgram::set_attach_target(const Probe &probe,
   if ((probe.type == ProbeType::fentry || probe.type == ProbeType::fexit) &&
       mod == "bpf") {
     attach_target = fun;
-    attach_fd_ = util::get_fd_for_bpf_prog(fun);
+    attach_fd_ = std::move(util::get_fd_for_bpf_prog(fun));
     if (attach_fd_ < 0) {
       err_msg = "No BPF program found with name: " + fun + ".";
     }
