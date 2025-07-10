@@ -67,6 +67,9 @@ int BPFtrace::exit_code = 0;
 volatile sig_atomic_t BPFtrace::exitsig_recv = false;
 volatile sig_atomic_t BPFtrace::sigusr1_recv = false;
 
+const std::string MISSING_PROBES_MSG =
+    "If this is expected, set the 'missing_probes' config variable to 'warn'.";
+
 static void log_probe_attach_failure(const std::string &err_msg,
                                      const std::string &name,
                                      ConfigMissingProbes missing_probes)
@@ -75,9 +78,8 @@ static void log_probe_attach_failure(const std::string &err_msg,
     if (!err_msg.empty()) {
       LOG(ERROR) << err_msg;
     }
-    LOG(ERROR) << "Unable to attach probe: " << name
-               << ". If this is expected, set the 'missing_probes' "
-                  "config variable to 'warn'.";
+    LOG(ERROR) << "Unable to attach probe: " << name << ". "
+               << MISSING_PROBES_MSG;
   } else if (missing_probes == ConfigMissingProbes::warn) {
     if (!err_msg.empty()) {
       LOG(WARNING) << err_msg;
@@ -638,8 +640,26 @@ int BPFtrace::run(Output &out, BpfBytecode bytecode)
   bytecode_ = std::move(bytecode);
   bytecode_.set_map_ids(resources);
 
+  auto prepare_error = false;
+  auto results = bytecode_.prepare_progs(resources, *btf_, *feature_);
+  for (auto &result : results) {
+    if (!result) {
+      if (config_->missing_probes == ConfigMissingProbes::error) {
+        LOG(ERROR) << result.takeError();
+        LOG(HINT) << MISSING_PROBES_MSG;
+        prepare_error = true;
+      } else if (config_->missing_probes == ConfigMissingProbes::warn) {
+        LOG(WARNING) << result.takeError();
+      }
+    }
+  }
+
+  if (prepare_error) {
+    return -1;
+  }
+
   try {
-    bytecode_.load_progs(resources, *btf_, *feature_, *config_);
+    bytecode_.load_progs(*config_);
   } catch (const HelperVerifierError &e) {
     // To provide the most useful diagnostics, provide the error for every
     // callsite. After all, they all must be fixed.

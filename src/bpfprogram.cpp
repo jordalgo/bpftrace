@@ -11,6 +11,13 @@
 
 namespace bpftrace {
 
+char AttachTargetError::ID;
+
+void AttachTargetError::log(llvm::raw_ostream &OS) const
+{
+  OS << msg;
+}
+
 BpfProgram::BpfProgram(struct bpf_program *bpf_prog) : bpf_prog_(bpf_prog)
 {
 }
@@ -58,13 +65,11 @@ void BpfProgram::set_expected_attach_type(const Probe &probe,
       bpf_prog_, static_cast<::bpf_attach_type>(attach_type));
 }
 
-void BpfProgram::set_attach_target(const Probe &probe,
-                                   const BTF &btf,
-                                   const Config &config)
+Result<OK> BpfProgram::set_attach_target(const Probe &probe, const BTF &btf)
 {
   if (probe.type != ProbeType::fentry && probe.type != ProbeType::fexit &&
       probe.type != ProbeType::iter && probe.type != ProbeType::rawtracepoint)
-    return;
+    return OK();
 
   const std::string &mod = probe.path;
   const std::string &fun = probe.attach_point;
@@ -96,17 +101,14 @@ void BpfProgram::set_attach_target(const Probe &probe,
   }
 
   if (!err_msg.empty()) {
-    if (config.missing_probes == ConfigMissingProbes::error) {
-      LOG(ERROR) << err_msg;
-    } else if (config.missing_probes == ConfigMissingProbes::warn) {
-      LOG(WARNING) << err_msg;
-    }
     bpf_program__set_autoload(bpf_prog_, false);
+    return make_error<AttachTargetError>(std::move(err_msg));
   }
 
   bpf_program__set_attach_target(bpf_prog_,
                                  attach_fd_ < 0 ? 0 : attach_fd_,
                                  attach_target.c_str());
+  return OK();
 }
 
 void BpfProgram::set_no_autoattach()

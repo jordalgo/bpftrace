@@ -197,10 +197,28 @@ bool is_log_trimmed(std::string_view log)
 }
 } // namespace
 
-void BpfBytecode::load_progs(const RequiredResources &resources,
-                             const BTF &btf,
-                             BPFfeature &feature,
-                             const Config &config)
+std::vector<Result<OK>> BpfBytecode::prepare_progs(
+    const RequiredResources &resources,
+    const BTF &btf,
+    BPFfeature &feature)
+{
+  std::vector<Result<OK>> results;
+  for (const auto &pair : resources.special_probes)
+    results.emplace_back(prepare_prog(pair.second, btf, feature));
+
+  for (const auto &probe : resources.signal_probes)
+    results.emplace_back(prepare_prog(probe, btf, feature));
+
+  for (const auto &probe : resources.probes)
+    results.emplace_back(prepare_prog(probe, btf, feature));
+
+  for (const auto &probe : resources.watchpoint_probes)
+    results.emplace_back(prepare_prog(probe, btf, feature));
+
+  return results;
+}
+
+void BpfBytecode::load_progs(const Config &config)
 {
   std::unordered_map<std::string_view, std::vector<char>> log_bufs;
   for (auto &[name, prog] : programs_) {
@@ -208,14 +226,6 @@ void BpfBytecode::load_progs(const RequiredResources &resources,
     auto &log_buf = log_bufs[name];
     bpf_program__set_log_buf(prog.bpf_prog(), log_buf.data(), log_buf.size());
   }
-
-  std::vector<Probe> special_probes;
-  for (auto probe : resources.special_probes)
-    special_probes.push_back(probe.second);
-  prepare_progs(special_probes, btf, feature, config);
-  prepare_progs(resources.signal_probes, btf, feature, config);
-  prepare_progs(resources.probes, btf, feature, config);
-  prepare_progs(resources.watchpoint_probes, btf, feature, config);
 
   int res = bpf_object__load(bpf_object_.get());
 
@@ -299,18 +309,17 @@ void BpfBytecode::load_progs(const RequiredResources &resources,
   throw util::FatalUserException("Loading BPF object(s) failed.");
 }
 
-void BpfBytecode::prepare_progs(const std::vector<Probe> &probes,
-                                const BTF &btf,
-                                BPFfeature &feature,
-                                const Config &config)
+Result<OK> BpfBytecode::prepare_prog(const Probe &probe,
+                                     const BTF &btf,
+                                     BPFfeature &feature)
 {
-  for (const auto &probe : probes) {
-    auto &program = getProgramForProbe(probe);
-    program.set_prog_type(probe);
-    program.set_expected_attach_type(probe, feature);
-    program.set_attach_target(probe, btf, config);
-    program.set_no_autoattach();
-  }
+  auto &program = getProgramForProbe(probe);
+  program.set_prog_type(probe);
+  program.set_expected_attach_type(probe, feature);
+  // set_attach_target() may fail if the probe is not attachable.
+  auto res = program.set_attach_target(probe, btf);
+  program.set_no_autoattach();
+  return res;
 }
 
 bool BpfBytecode::all_progs_loaded()

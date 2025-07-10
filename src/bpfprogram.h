@@ -8,7 +8,19 @@
 #include "probe_types.h"
 #include "util/fd.h"
 
+#include "util/result.h"
+
 namespace bpftrace {
+
+class AttachTargetError : public ErrorInfo<AttachTargetError> {
+public:
+  AttachTargetError(std::string &&msg) : msg(std::move(msg)) {};
+  static char ID;
+  void log(llvm::raw_ostream &OS) const override;
+
+private:
+  std::string msg;
+};
 
 class BpfBytecode;
 class BPFtrace;
@@ -21,9 +33,7 @@ public:
 
   void set_prog_type(const Probe &probe);
   void set_expected_attach_type(const Probe &probe, BPFfeature &feature);
-  void set_attach_target(const Probe &probe,
-                         const BTF &btf,
-                         const Config &config);
+  Result<OK> set_attach_target(const Probe &probe, const BTF &btf);
   void set_no_autoattach();
 
   int fd() const;
