@@ -2050,6 +2050,7 @@ TEST_F(SemanticAnalyserTest, unop_increment_decrement)
 
 TEST_F(SemanticAnalyserTest, printf)
 {
+  /// hello
   test("kprobe:f { printf(\"hi\") }");
   test("kprobe:f { printf(1234) }", Error{});
   test("kprobe:f { printf() }", Error{});
