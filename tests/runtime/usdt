@@ -222,7 +222,7 @@ EXPECT 1
 BEFORE ./testprogs/usdt_sized_args
 
 NAME usdt constant arguments
-RUN {{BPFTRACE}} -e 'usdt:./testprogs/usdt_args:usdt_args:const_* { printf("%lld ", arg0); }' -c ./testprogs/usdt_args
+RUN {{BPFTRACE}} -e 'config = { missing_probes  =warn } usdt:./testprogs/usdt_args:usdt_args:const_* { printf("%lld ", arg0); }' -c ./testprogs/usdt_args
 EXPECT -579005069656919568 -579005069656919568 4092785136 -202182160 61936 -3600 240 -16
 
 NAME usdt reg arguments

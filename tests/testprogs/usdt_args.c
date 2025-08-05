@@ -1,5 +1,8 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 #include "sdt.h"
 
@@ -88,47 +91,51 @@ int main()
     array[i].i_u64 = test_value;
   }
 
-  /* Constants */
-  DTRACE_PROBE1(usdt_args, const_u64, (uint64_t)test_value);
-  DTRACE_PROBE1(usdt_args, const_64, (int64_t)test_value);
-  DTRACE_PROBE1(usdt_args, const_u32, (uint32_t)test_value);
-  DTRACE_PROBE1(usdt_args, const_32, (int32_t)test_value);
-  DTRACE_PROBE1(usdt_args, const_u16, (uint16_t)test_value);
-  DTRACE_PROBE1(usdt_args, const_16, (int16_t)test_value);
-  DTRACE_PROBE1(usdt_args, const_u8, (uint8_t)test_value);
-  DTRACE_PROBE1(usdt_args, const_8, (int8_t)test_value);
+  while (1) {
 
-  /* Direct register reads - start from 64 and work down
-   * to verify the correct number of bytes are read */
-  PROBE_REG(rax, u, 64);
-  PROBE_REG(rax, , 64);
-  PROBE_REG(eax, u, 32);
-  PROBE_REG(eax, , 32);
-  PROBE_REG(ax, u, 16);
-  PROBE_REG(ax, , 16);
-  PROBE_REG(al, u, 8);
-  PROBE_REG(al, , 8);
+    /* Constants */
+    DTRACE_PROBE1(usdt_args, const_u64, (uint64_t)test_value);
+    DTRACE_PROBE1(usdt_args, const_64, (int64_t)test_value);
+    DTRACE_PROBE1(usdt_args, const_u32, (uint32_t)test_value);
+    DTRACE_PROBE1(usdt_args, const_32, (int32_t)test_value);
+    DTRACE_PROBE1(usdt_args, const_u16, (uint16_t)test_value);
+    DTRACE_PROBE1(usdt_args, const_16, (int16_t)test_value);
+    DTRACE_PROBE1(usdt_args, const_u8, (uint8_t)test_value);
+    DTRACE_PROBE1(usdt_args, const_8, (int8_t)test_value);
 
-  /* Base address most likely with and offset(aka. displacement) */
-  PROBE_ADDRESS(u, 64);
-  PROBE_ADDRESS(, 64);
-  PROBE_ADDRESS(u, 32);
-  PROBE_ADDRESS(, 32);
-  PROBE_ADDRESS(u, 16);
-  PROBE_ADDRESS(, 16);
-  PROBE_ADDRESS(u, 8);
-  PROBE_ADDRESS(, 8);
+    /* Direct register reads - start from 64 and work down
+    * to verify the correct number of bytes are read */
+    PROBE_REG(rax, u, 64);
+    PROBE_REG(rax, , 64);
+    PROBE_REG(eax, u, 32);
+    PROBE_REG(eax, , 32);
+    PROBE_REG(ax, u, 16);
+    PROBE_REG(ax, , 16);
+    PROBE_REG(al, u, 8);
+    PROBE_REG(al, , 8);
 
-  /* Base address + offset + (index * scale) */
-  for (volatile int i = 7; i <= 7; i++) {
-    PROBE_INDEX(u, 64);
-    PROBE_INDEX(, 64);
-    PROBE_INDEX(u, 32);
-    PROBE_INDEX(, 32);
-    PROBE_INDEX(u, 16);
-    PROBE_INDEX(, 16);
-    PROBE_INDEX(u, 8);
-    PROBE_INDEX(, 8);
+    /* Base address most likely with and offset(aka. displacement) */
+    PROBE_ADDRESS(u, 64);
+    PROBE_ADDRESS(, 64);
+    PROBE_ADDRESS(u, 32);
+    PROBE_ADDRESS(, 32);
+    PROBE_ADDRESS(u, 16);
+    PROBE_ADDRESS(, 16);
+    PROBE_ADDRESS(u, 8);
+    PROBE_ADDRESS(, 8);
+
+    /* Base address + offset + (index * scale) */
+    for (volatile int i = 7; i <= 7; i++) {
+      PROBE_INDEX(u, 64);
+      PROBE_INDEX(, 64);
+      PROBE_INDEX(u, 32);
+      PROBE_INDEX(, 32);
+      PROBE_INDEX(u, 16);
+      PROBE_INDEX(, 16);
+      PROBE_INDEX(u, 8);
+      PROBE_INDEX(, 8);
+    }
+    usleep(1000000);
   }
 
 /* TLS not yet supported, need label and segment support */

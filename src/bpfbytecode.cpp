@@ -202,6 +202,7 @@ void BpfBytecode::load_progs(const RequiredResources &resources,
                              BPFfeature &feature,
                              const Config &config)
 {
+  LOG(WARNING) << "Loading progs";
   std::unordered_map<std::string_view, std::vector<char>> log_bufs;
   for (auto &[name, prog] : programs_) {
     log_bufs[name] = std::vector<char>(config.log_size, '\0');
