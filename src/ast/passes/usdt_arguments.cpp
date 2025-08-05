@@ -30,7 +30,7 @@ public:
     auto *int_arg = ast_.make_node<ast::Integer>(static_cast<uint64_t>(arg),
                                                  Location(node.loc));
     std::vector<Expression> args = { ctx_arg, int_arg };
-    Expression expr = ast_.make_node<ast::Call>("__usdt_arg",
+    Expression expr = ast_.make_node<ast::Call>("usdt_arg",
                                                 std::move(args),
                                                 Location(node.loc));
     return ast_.make_node<AssignVarStatement>(var(arg, node),
