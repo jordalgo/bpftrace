@@ -1259,3 +1259,11 @@ macro username() {
 // **async**
 //
 // Set all values (for all keys) in the map to zero.
+
+// Returns the argument of an USDT probe at the given index.
+// This is the same as using the `argN` builtin.
+//
+// :variant int64 usdt_arg(uint8 $x)
+macro usdt_arg($x) {
+   __usdt_arg((int64)ctx, (int64)$x)
+}
