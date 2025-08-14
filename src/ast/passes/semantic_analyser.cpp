@@ -2148,6 +2148,15 @@ void SemanticAnalyser::visit(MapDeclStatement &decl)
 
 void SemanticAnalyser::visit(Map &map)
 {
+  auto found_error = map_metadata_.errors.find(&map);
+  if (found_error != map_metadata_.errors.end() &&
+      found_error->second == MapError::ACCESS_SCALAR) {
+    map.addError()
+        << map.ident
+        << " used as a map without an explicit key (scalar map), previously "
+           "used with an explicit key (non-scalar map)";
+  }
+
   auto val = map_val_.find(map.ident);
   if (val != map_val_.end()) {
     map.value_type = val->second;
@@ -3109,6 +3118,14 @@ void SemanticAnalyser::visit(FieldAccess &acc)
 
 void SemanticAnalyser::visit(MapAccess &acc)
 {
+  auto found_error = map_metadata_.errors.find(acc.map);
+  if (found_error != map_metadata_.errors.end() &&
+      found_error->second == MapError::ACCESS_NON_SCALAR) {
+    acc.addError() << acc.map->ident
+                   << " used as a map with an explicit key (non-scalar map), "
+                      "previously used without an explicit key (scalar map)";
+  }
+
   visit(acc.map);
   visit(acc.key);
   reconcile_map_key(acc.map, acc.key);
@@ -4111,6 +4128,25 @@ bool SemanticAnalyser::check_call(const Call &call)
        ++i) {
     std::visit([&](const auto &v) { ret = ret && check_arg(call, i, v); },
                spec->second.arg_types.at(i));
+  }
+
+  if (!call.vargs.empty()) {
+    if (auto *map = call.vargs.at(0).as<Map>()) {
+      auto found_error = map_metadata_.errors.find(map);
+      if (found_error != map_metadata_.errors.end()) {
+        if (found_error->second == MapError::CALL_NON_SCALAR) {
+          map->addError()
+              << "call to " << call.func
+              << "() expects a map with explicit keys (non-scalar map)";
+          ret = false;
+        } else if (found_error->second == MapError::CALL_SCALAR) {
+          map->addError()
+              << "call to " << call.func
+              << "() expects a map without explicit keys (scalar map)";
+          ret = false;
+        }
+      }
+    }
   }
 
   return ret;
