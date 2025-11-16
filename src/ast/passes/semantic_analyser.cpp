@@ -412,7 +412,7 @@ static const std::map<std::string, call_spec> CALL_SPEC = {
     { .min_args=1,
       .max_args=1,
        } },
-  { "kstack",
+  { "__builtin_kstack",
     { .min_args=0,
       .max_args=2,
        } },
@@ -612,7 +612,7 @@ static const std::map<std::string, call_spec> CALL_SPEC = {
     { .min_args=1,
       .max_args=1,
        } },
-  { "ustack",
+  { "__builtin_ustack",
     { .min_args=0,
       .max_args=2,
        } },
@@ -928,10 +928,10 @@ void SemanticAnalyser::visit(Builtin &builtin)
     // For kretprobe, fentry, fexit -> AddrSpace::kernel
     // For uretprobe -> AddrSpace::user
     builtin.builtin_type.SetAS(find_addrspace(type));
-  } else if (builtin.ident == "kstack") {
+  } else if (builtin.ident == "__builtin_kstack") {
     builtin.builtin_type = CreateStack(
         true, StackType{ .mode = bpftrace_.config_->stack_mode });
-  } else if (builtin.ident == "ustack") {
+  } else if (builtin.ident == "__builtin_ustack") {
     builtin.builtin_type = CreateStack(
         false, StackType{ .mode = bpftrace_.config_->stack_mode });
   } else if (builtin.ident == "__builtin_comm") {
@@ -1612,9 +1612,9 @@ void SemanticAnalyser::visit(Call &call)
         call.addError() << "strftime() can not take a monotonic timestamp";
       }
     }
-  } else if (call.func == "kstack") {
+  } else if (call.func == "__builtin_kstack") {
     check_stack_call(call, true);
-  } else if (call.func == "ustack") {
+  } else if (call.func == "__builtin_ustack") {
     check_stack_call(call, false);
   } else if (call.func == "path") {
     auto *probe = get_probe(call, call.func);
