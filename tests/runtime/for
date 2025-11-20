@@ -137,9 +137,9 @@ PROG begin { for ($i : 1..4) { if ($i == 2) { continue; } print($i); }  }
 EXPECT_REGEX .*\n1\n3\n\n
 
 NAME external function call map
-PROG begin { @map[1] = 1; $x = 1; for ($kv : @map) { print(__has_key((void *)&@map, (void *)&$x)); }  }
-EXPECT true
+PROG begin { @map[1] = 1; $x = (1, 1); for ($kv : @map) { print(__memcmp((void *)&$kv, (void *)&$x, (size_t)sizeof($x))); }  }
+EXPECT 0
 
 NAME external function call range
-PROG begin { @map[1] = 1; $x = 1; for ($i : 0..1) { print(__has_key((void *)&@map, (void *)&$x)); }  }
-EXPECT true
+PROG begin { $x = 1; for ($i : 1..2) { print(__memcmp((void *)&$i, (void *)&$x, (size_t)sizeof($x))); }  }
+EXPECT 0
