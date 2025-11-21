@@ -575,6 +575,7 @@ macro len(e) {
 // than the corresponding byte in right.
 //
 macro memcmp($left, $right, count) {
+  import "stdlib/system/system.bpf.c";
   __memcmp((void *)&$left, (void *)&$right, count)
 }
 

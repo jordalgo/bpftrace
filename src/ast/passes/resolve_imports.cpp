@@ -14,21 +14,6 @@ namespace bpftrace::ast {
 
 using bpftrace::stdlib::Stdlib;
 
-class ResolveImports : public Visitor<ResolveImports> {
-public:
-  ResolveImports(Imports &imports,
-                 const std::vector<std::filesystem::path> &paths = {})
-      : imports_(imports), paths_(paths) {};
-
-  using Visitor<ResolveImports>::visit;
-  void visit(Import &imp);
-  void visit(Program &program);
-
-private:
-  Imports &imports_;
-  const std::vector<std::filesystem::path> &paths_;
-};
-
 class ResolveRootImports : public Visitor<ResolveRootImports> {
 public:
   ResolveRootImports(Imports &imports,
@@ -98,7 +83,7 @@ static Result<OK> import_script(Node &node,
   }
 
   // Recursively visit the parsed tree.
-  ResolveImports resolver(imports, paths);
+  ResolveRootImports resolver(imports, paths);
   resolver.visit(ast.root);
 
   return OK();
@@ -320,40 +305,6 @@ Result<OK> Imports::import_any(Node &node,
   return OK();
 }
 
-void ResolveImports::visit(Import &imp)
-{
-  static std::string import_error =
-      "Import statements that are not at the root are limited to specific "
-      "object (.o), header (.h), or C source (.c or bpf.c) files";
-  std::filesystem::path path(imp.name);
-  if (std::filesystem::is_directory(path)) {
-    imp.addError() << import_error;
-  } else if (path.extension() == ".bt") {
-    imp.addError() << import_error;
-  } else {
-    // This is really just to make sure new additions to the standard library
-    // don't try to import files they don't explicitly need
-    for (const auto &[internal_path, s] : Stdlib::files) {
-      auto path = std::filesystem::path(internal_path);
-      if (path.parent_path().string() == imp.name) {
-        imp.addError() << import_error;
-        break;
-      }
-    }
-  }
-  auto ok = imports_.import_any(imp, imp.name, paths_);
-  if (!ok) {
-    imp.addError() << "import error: " << ok.takeError();
-  }
-}
-
-void ResolveImports::visit(Program &program)
-{
-  // Skip the root imports
-  visit(program.functions);
-  visit(program.probes);
-}
-
 void ResolveRootImports::visit(Program &program)
 {
   for (auto *imp : program.imports) {
@@ -398,15 +349,6 @@ Pass CreateResolveRootImportsPass(std::vector<std::string> &&import_paths)
                         }
                         return imports;
                       });
-}
-
-Pass CreateResolveImportsPass()
-{
-  return Pass::create("ResolveImports", [](ASTContext &ast, Imports &imports) {
-    std::vector<std::filesystem::path> updated_paths = {};
-    ResolveImports analyser(imports, updated_paths);
-    analyser.visit(ast.root);
-  });
 }
 
 } // namespace bpftrace::ast

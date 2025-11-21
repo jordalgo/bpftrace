@@ -59,7 +59,6 @@ inline std::vector<Pass> AllParsePasses(
   passes.emplace_back(CreateMapSugarPass());
   passes.emplace_back(CreateNamedParamsPass());
   passes.emplace_back(CreatePidFilterPass());
-  passes.emplace_back(CreateResolveImportsPass());
   return passes;
 }
 
