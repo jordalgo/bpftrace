@@ -48,23 +48,31 @@ Result<output::Primitive> format(BPFtrace &bpftrace,
       return output::Primitive::Symbolic(res.str(), n);
     }
     case Type::kstack_t: {
-      return bpftrace.get_stack(value.bitcast<uint64_t>(0),
-                                value.bitcast<uint64_t>(1),
-                                -1,
-                                -1,
-                                false,
-                                type.stack_type,
-                                8);
+      uint64_t num_frames = value.bitcast<uint64_t>(0);
+      std::vector<uint64_t> stack(num_frames);
+      const auto *raw_stack =
+          value.slice(sizeof(uint64_t), sizeof(uint64_t) * num_frames).data();
+      memcpy(stack.data(), raw_stack, sizeof(uint64_t) * num_frames);
+
+      return bpftrace.get_stack(
+          num_frames, std::move(stack), -1, -1, false, type.stack_type, 8);
     }
     case Type::ustack_t: {
-      return bpftrace.get_stack(
-          value.bitcast<uint64_t>(0),
-          value.bitcast<uint64_t>(1),
-          value.slice(2 * sizeof(uint64_t)).bitcast<int32_t>(0),
-          value.slice(2 * sizeof(uint64_t)).bitcast<int32_t>(1),
-          true,
-          type.stack_type,
-          8);
+      uint64_t num_frames = value.slice(sizeof(uint64_t)).bitcast<uint64_t>(0);
+      std::vector<uint64_t> stack(num_frames);
+      const auto *raw_stack = value
+                                  .slice(sizeof(uint64_t) * 2,
+                                         sizeof(uint64_t) * num_frames)
+                                  .data();
+      memcpy(stack.data(), raw_stack, sizeof(uint64_t) * num_frames);
+
+      return bpftrace.get_stack(num_frames,
+                                std::move(stack),
+                                value.bitcast<int32_t>(0),
+                                value.bitcast<int32_t>(1),
+                                true,
+                                type.stack_type,
+                                8);
     }
     case Type::ksym_t: {
       return bpftrace.resolve_ksym(value.bitcast<uint64_t>());

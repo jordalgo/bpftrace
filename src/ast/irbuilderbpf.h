@@ -135,6 +135,9 @@ public:
   Value *CreateTupleAllocation(const SizedType &tuple_type,
                                const std::string &name,
                                const Location &loc);
+  Value *CreateKUStackAllocation(const SizedType &stack_type,
+                               const std::string &name,
+                               const Location &loc);
   Value *CreateWriteMapValueAllocation(const SizedType &value_type,
                                        const std::string &name,
                                        const Location &loc);
@@ -183,7 +186,7 @@ public:
   void CreateHelperErrorCond(Value *return_value,
                              bpf_func_id func_id,
                              const Location &loc);
-  StructType *GetStackStructType(bool is_ustack);
+  StructType *GetStackStructType(bool is_ustack, uint16_t limit);
   StructType *GetStructType(const std::string &name,
                             const std::vector<llvm::Type *> &elements,
                             bool packed = false);

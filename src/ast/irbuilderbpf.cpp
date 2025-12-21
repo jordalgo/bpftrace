@@ -134,7 +134,7 @@ AllocaInst *IRBuilderBPF::CreateUSym(Value *val,
   return buf;
 }
 
-StructType *IRBuilderBPF::GetStackStructType(bool is_ustack)
+StructType *IRBuilderBPF::GetStackStructType(bool is_ustack, uint16_t limit)
 {
   // Kernel stacks should not be differentiated by pid, since the kernel
   // address space is the same between pids (and when aggregating you *want*
@@ -144,16 +144,16 @@ StructType *IRBuilderBPF::GetStackStructType(bool is_ustack)
   // process exited).
   if (is_ustack) {
     std::vector<llvm::Type *> elements{
-      getInt64Ty(), // stack id
-      getInt64Ty(), // nr_stack_frames
-      getInt32Ty(), // pid
-      getInt32Ty(), // probe id
+      getInt32Ty(),                        // pid
+      getInt32Ty(),                        // probe id
+      getInt64Ty(),                        // nr_stack_frames
+      ArrayType::get(getInt64Ty(), limit), // stack of addresses
     };
     return GetStructType("ustack_key", elements, false);
   } else {
     std::vector<llvm::Type *> elements{
-      getInt64Ty(), // stack id
-      getInt64Ty(), // nr_stack_frames
+      getInt64Ty(),                        // nr_stack_frames
+      ArrayType::get(getInt64Ty(), limit), // stack of addresses
     };
     return GetStructType("kstack_key", elements, false);
   }
@@ -367,7 +367,7 @@ llvm::Type *IRBuilderBPF::GetType(const SizedType &stype)
 
     ty = GetStructType(ty_name, llvm_elems, false);
   } else if (stype.IsStack()) {
-    ty = GetStackStructType(stype.IsUstackTy());
+    ty = GetStackStructType(stype.IsUstackTy(), stype.stack_type.limit);
   } else if (stype.IsPtrTy()) {
     ty = getPtrTy();
   } else if (stype.IsVoidTy()) {
@@ -538,11 +538,8 @@ CallInst *IRBuilderBPF::CreateGetStackScratchMap(StackType stack_type,
                                                  BasicBlock *failure_callback,
                                                  const Location &loc)
 {
-  SizedType value_type = CreateArray(stack_type.limit, CreateUInt64());
-  return createGetScratchMap(StackType::scratch_name(),
-                             StackType::scratch_name(),
-                             loc,
-                             failure_callback);
+  return createGetScratchMap(
+      stack_type.name(), stack_type.name(), loc, failure_callback);
 }
 
 Value *IRBuilderBPF::CreateGetStrAllocation(const std::string &name,
@@ -576,6 +573,19 @@ Value *IRBuilderBPF::CreateTupleAllocation(const SizedType &tuple_type,
                           loc,
                           [](AsyncIds &async_ids) {
                             return async_ids.tuple();
+                          });
+}
+
+Value *IRBuilderBPF::CreateKUStackAllocation(const SizedType &stack_type,
+                                             const std::string &name,
+                                             const Location &loc)
+{
+  return createAllocation(bpftrace::globalvars::KU_STACK_BUFFER,
+                          GetType(stack_type),
+                          name,
+                          loc,
+                          [](AsyncIds &async_ids) {
+                            return async_ids.ku_stack();
                           });
 }
 

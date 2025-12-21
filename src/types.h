@@ -126,12 +126,6 @@ struct StackType {
            std::to_string(limit);
   }
 
-  static const std::string &scratch_name()
-  {
-    static const std::string scratch_name = "stack_scratch";
-    return scratch_name;
-  }
-
 private:
   friend class cereal::access;
   template <typename Archive>
