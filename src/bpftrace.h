@@ -129,8 +129,8 @@ public:
       Probe &probe,
       const BpfBytecode &bytecode);
   int run_iter();
-  std::string get_stack(int64_t stackid,
-                        uint32_t nr_stack_frames,
+  std::string get_stack(uint64_t nr_stack_frames,
+                        std::vector<uint64_t>&& raw_stack,
                         int32_t pid,
                         int32_t probe_id,
                         bool ustack,
