@@ -75,12 +75,14 @@ enum class StackMode : uint8_t {
   bpftrace,
   perf,
   raw,
+  build_id
 };
 
 const std::map<StackMode, std::string> STACK_MODE_NAME_MAP = {
   { StackMode::bpftrace, "bpftrace" },
   { StackMode::perf, "perf" },
   { StackMode::raw, "raw" },
+  { StackMode::build_id, "build_id" },
 };
 
 template <>
@@ -110,11 +112,23 @@ struct ConfigParser<StackMode> {
   }
 };
 
+struct stack_with_build_id {
+	int32_t status;
+	unsigned char	build_id[20];
+	union {
+		uint64_t offset;
+		uint64_t ip;
+	};
+};
+
 struct StackType {
   // N.B. the limit of 127 defines the default stack size.
   uint16_t limit = 127;
+  // IPs (8) but stack_with_build_id (32)
+  uint16_t stack_elem_size = 8;
   StackMode mode = StackMode::bpftrace;
   bool kernel = true;
+
 
   bool operator==(const StackType &obj) const
   {
@@ -598,6 +612,8 @@ struct hash<bpftrace::StackType> {
         return std::hash<std::string>()("perf#" + to_string(obj.limit));
       case bpftrace::StackMode::raw:
         return std::hash<std::string>()("raw#" + to_string(obj.limit));
+      case bpftrace::StackMode::build_id:
+        return std::hash<std::string>()("build_id#" + to_string(obj.limit));
     }
 
     return {}; // unreached

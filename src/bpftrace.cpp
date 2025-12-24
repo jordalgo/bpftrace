@@ -990,6 +990,26 @@ std::optional<std::string> BPFtrace::get_watchpoint_binary_path() const
 }
 
 std::string BPFtrace::get_stack(uint64_t nr_stack_frames,
+                        std::vector<stack_with_build_id>&& raw_stack,
+                        int indent)
+{
+  std::ostringstream stack;
+  std::string padding(indent, ' ');
+
+  stack << "\n";
+  for (uint64_t i = 0; i < nr_stack_frames; ++i) {
+    auto build_id_struct = raw_stack.at(i);
+    if (build_id_struct.status == 1) {
+      stack << build_id_struct.build_id << " + " << build_id_struct.offset << std::endl;
+    } else {
+      stack << std::hex << build_id_struct.ip << std::endl;
+    }
+  }
+
+  return stack.str();
+}
+
+std::string BPFtrace::get_stack(uint64_t nr_stack_frames,
                                 std::vector<uint64_t> &&raw_stack,
                                 int32_t pid,
                                 int32_t probe_id,
@@ -1034,7 +1054,8 @@ std::string BPFtrace::get_stack(uint64_t nr_stack_frames,
                 << std::endl;
           break;
         case StackMode::raw:
-          LOG(BUG) << "StackMode::raw should have been processed before "
+        case StackMode::build_id:
+          LOG(BUG) << "StackMode::raw or build_id should have been processed before "
                       "symbolication.";
           break;
       }

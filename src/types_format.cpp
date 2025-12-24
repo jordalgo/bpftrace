@@ -62,8 +62,16 @@ Result<output::Primitive> format(BPFtrace &bpftrace,
     case Type::ustack_t: {
       auto num_frames = value.bitcast<uint64_t>(0);
       constexpr size_t stack_offset = sizeof(uint64_t);
-
       auto limit = type.stack_type.limit;
+      if (type.stack_type.mode == StackMode::build_id) {
+        std::vector<stack_with_build_id> stack(limit);
+        const auto *raw_stack =
+            value.slice(stack_offset, type.stack_type.stack_elem_size * limit).data();
+        memcpy(stack.data(), raw_stack, type.stack_type.stack_elem_size * limit);
+
+        return bpftrace.get_stack(num_frames, std::move(stack), 8);
+      }
+
       std::vector<uint64_t> stack(limit);
       const auto *raw_stack =
           value.slice(stack_offset, sizeof(uint64_t) * limit).data();

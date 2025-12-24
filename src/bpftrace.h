@@ -136,6 +136,9 @@ public:
                         bool ustack,
                         StackType stack_type,
                         int indent = 0);
+  std::string get_stack(uint64_t nr_stack_frames,
+                        std::vector<stack_with_build_id>&& raw_stack,
+                        int indent = 0);
   std::string resolve_ksym(uint64_t addr);
   std::string resolve_usym(uint64_t addr, int32_t pid, int32_t probe_id);
   std::string resolve_inet(int af, const char *inet) const;
