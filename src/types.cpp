@@ -131,7 +131,16 @@ bool SizedType::IsSameType(const SizedType &t) const
       return false;
 
     for (ssize_t i = 0; i < GetFieldCount(); i++) {
-      if (!GetField(i).type.IsSameType(t.GetField(i).type))
+      const auto &left_field = GetField(i);
+      const auto &right_field = t.GetField(i);
+
+      if (!left_field.name.empty() && !right_field.name.empty()) {
+        if (left_field.name != right_field.name) {
+          return false;
+        }
+      }
+
+      if (!left_field.type.IsSameType(right_field.type))
         return false;
     }
   }
@@ -175,6 +184,8 @@ std::strong_ordering SizedType::operator<=>(const SizedType &t) const
       return cmp;
     for (ssize_t i = 0; i < GetFieldCount(); i++) {
       if (auto cmp = GetField(i).type <=> t.GetField(i).type; cmp != 0)
+        return cmp;
+      if (auto cmp = GetField(i).name <=> t.GetField(i).name; cmp != 0)
         return cmp;
     }
     return std::strong_ordering::equal;
@@ -489,6 +500,7 @@ SizedType CreateTuple(std::shared_ptr<Struct> &&tuple)
 {
   auto s = SizedType(Type::tuple, tuple->size);
   s.inner_struct_ = std::move(tuple);
+  s.name_ = "anon";
   return s;
 }
 
@@ -564,13 +576,13 @@ ssize_t SizedType::GetInTupleAlignment() const
 
 bool SizedType::HasField(const std::string &name) const
 {
-  assert(IsRecordTy());
+  assert(IsRecordTy() || IsTupleTy());
   return inner_struct()->HasField(name);
 }
 
 const Field &SizedType::GetField(const std::string &name) const
 {
-  assert(IsRecordTy());
+  assert(IsRecordTy() || IsTupleTy());
   return inner_struct()->GetField(name);
 }
 

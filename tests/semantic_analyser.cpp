@@ -2616,6 +2616,9 @@ TEST_F(SemanticAnalyserTest, field_access)
   test(structs + "kprobe:f { $x = *(struct type1*)cpu; $x.field }");
   test(structs + "kprobe:f { @x = *(struct type1*)cpu; @x.field }");
   test("struct task_struct {int x;} kprobe:f { curtask->x }");
+  test("kprobe:f { $a = (age=10); $a.age }");
+  test("kprobe:f { $a = (age=10); $a->age }");
+  test("kprobe:f { $a = (person=(age=10)); $a.person.age }");
 }
 
 TEST_F(SemanticAnalyserTest, field_access_wrong_field)
@@ -2624,6 +2627,8 @@ TEST_F(SemanticAnalyserTest, field_access_wrong_field)
   test(structs + "kprobe:f { ((struct type1 *)cpu)->blah }", Error{});
   test(structs + "kprobe:f { $x = (struct type1 *)cpu; $x->blah }", Error{});
   test(structs + "kprobe:f { @x = (struct type1 *)cpu; @x->blah }", Error{});
+  test("kprobe:f { $a = (age=10); $a.name }", Error{});
+  test("kprobe:f { $a = (age=10); $a->name }", Error{});
 }
 
 TEST_F(SemanticAnalyserTest, field_access_wrong_expr)
@@ -2649,6 +2654,9 @@ TEST_F(SemanticAnalyserTest, field_access_types)
   test(structs + "kprobe:f { (*((struct type1*)0)).mystr"
                  " == (*((struct type2*)0)).field }",
        Error{});
+
+  test("kprobe:f { $a = (age=10); $a.age == -10 }");
+  test("kprobe:f { $a = (age=10); $a.age == \"tomato\" }", Error{});
 }
 
 TEST_F(SemanticAnalyserTest, field_access_pointer)
@@ -3950,6 +3958,20 @@ TEST_F(SemanticAnalyserTest, tuple_indexing)
 
   test(R"(begin { (1,2,3).3 })", Error{});
   test(R"(begin { (1,2,3).9999999999999 })", Error{});
+}
+
+TEST_F(SemanticAnalyserTest, named_tuple_fields)
+{
+  test(R"(begin { $t = (left=1, right=2); })");
+  test(R"(begin { $t = (left=1, right=2); $t = (left=10, right=20); })");
+  test(R"(begin { $t = (left=1, right=2); $t = (-1, 100); })");
+
+  test(R"(begin { $t = (left=1, right=2); $t = (bad=-1, good=100); })",
+       Error{});
+  test(R"(begin { $t = (left=1, right=2); $t = (left=-1, right="hello"); })",
+       Error{});
+  test(R"(begin { $t = (left=1, right=2); $t = (left=-1, right=20, up=10); })",
+       Error{});
 }
 
 // More in depth inspection of AST

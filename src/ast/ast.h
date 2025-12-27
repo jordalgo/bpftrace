@@ -1239,10 +1239,47 @@ public:
   Expression expr;
 };
 
+class AssignFieldStatement : public Node {
+public:
+  explicit AssignFieldStatement(ASTContext &ctx,
+                              Location &&loc,
+                              std::string name,
+                              Expression expr)
+      : Node(ctx, std::move(loc)), name(std::move(name)), expr(std::move(expr)) {};
+  explicit AssignFieldStatement(ASTContext &ctx,
+                              const Location &loc,
+                              const AssignFieldStatement &other)
+      : Node(ctx, loc + other.loc),
+        name(other.name),
+        expr(clone(ctx, loc, other.expr)) {};
+
+  bool operator==(const AssignFieldStatement &other) const
+  {
+    return name == other.name && expr == other.expr;
+  }
+  std::strong_ordering operator<=>(const AssignFieldStatement &other) const
+  {
+    return expr <=> other.expr;
+  }
+
+  const std::string name;
+  Expression expr;
+};
+
+using AssignFieldStatementList = std::vector<AssignFieldStatement *>;
+
+
 class Tuple : public Node {
 public:
   explicit Tuple(ASTContext &ctx, Location &&loc, ExpressionList &&elems)
       : Node(ctx, std::move(loc)), elems(std::move(elems)) {};
+  explicit Tuple(ASTContext &ctx, Location &&loc, AssignFieldStatementList &&fields)
+      : Node(ctx, std::move(loc)) {
+        for (auto field : fields) {
+          elems.emplace_back(field->expr);
+          elem_names.emplace_back(field->name);
+        }
+      };
   explicit Tuple(ASTContext &ctx, const Location &loc, const Tuple &other)
       : Node(ctx, loc + other.loc), elems(clone(ctx, loc, other.elems)) {};
 
@@ -1259,10 +1296,13 @@ public:
   {
     if (auto cmp = elems <=> other.elems; cmp != 0)
       return cmp;
+    if (auto cmp = elem_names <=> other.elem_names; cmp != 0)
+      return cmp;
     return tuple_type <=> other.tuple_type;
   }
 
   ExpressionList elems;
+  std::vector<std::string> elem_names;
   SizedType tuple_type;
 };
 

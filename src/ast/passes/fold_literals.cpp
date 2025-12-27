@@ -35,6 +35,7 @@ public:
   std::optional<Expression> visit(BlockExpr &block_expr);
   std::optional<Expression> visit(ArrayAccess &acc);
   std::optional<Expression> visit(TupleAccess &acc);
+  std::optional<Expression> visit(FieldAccess &acc);
   std::optional<Expression> visit(Comptime &comptime);
 
 private:
@@ -840,6 +841,24 @@ std::optional<Expression> LiteralFolder::visit(TupleAccess &acc)
       return std::nullopt;
     }
     return tuple->elems[acc.index];
+  }
+
+  return std::nullopt;
+}
+
+std::optional<Expression> LiteralFolder::visit(FieldAccess &acc)
+{
+  visit(acc.expr);
+
+  if (acc.expr.is<Tuple>() && acc.expr.is_literal()) {
+    auto *tuple = acc.expr.as<Tuple>();
+    if (!tuple->elem_names.empty()) {
+      for (size_t i = 0; i < tuple->elem_names.size(); ++i) {
+        if (tuple->elem_names.at(i) == acc.field) {
+          return tuple->elems[i];
+        }
+      }
+    }
   }
 
   return std::nullopt;
