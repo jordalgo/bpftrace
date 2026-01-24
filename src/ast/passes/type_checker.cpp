@@ -488,20 +488,6 @@ static bool IsValidVarDeclType(const SizedType &ty)
   return false; // unreachable
 }
 
-bool IsValidPtrOp(Operator op)
-{
-  switch (op) {
-    case Operator::PRE_INCREMENT:
-    case Operator::PRE_DECREMENT:
-    case Operator::POST_INCREMENT:
-    case Operator::POST_DECREMENT:
-    case Operator::MUL:
-      return true;
-    default:
-      return false;
-  }
-}
-
 void TypeChecker::visit(String &string)
 {
   if ((func_ == "printf" || func_ == "errorf" || func_ == "warnf") &&
@@ -1234,13 +1220,6 @@ void TypeChecker::visit(ArrayAccess &arr)
 
   const SizedType &type = arr.expr.type();
 
-  if (!type.IsArrayTy() && !type.IsPtrTy() && !type.IsStringTy()) {
-    arr.addError() << "The array index operator [] can only be "
-                      "used on arrays and pointers, found "
-                   << type.GetTy() << ".";
-    return;
-  }
-
   if (type.IsPtrTy() && type.GetPointeeTy().GetSize() == 0) {
     arr.addError() << "The array index operator [] cannot be used "
                       "on a pointer to an unsized type (void *).";
@@ -1332,33 +1311,7 @@ void TypeChecker::visit(Binop &binop)
 
 void TypeChecker::visit(Unop &unop)
 {
-  if (unop.op == Operator::PRE_INCREMENT ||
-      unop.op == Operator::PRE_DECREMENT ||
-      unop.op == Operator::POST_INCREMENT ||
-      unop.op == Operator::POST_DECREMENT) {
-    if (!unop.expr.is<Variable>() && !unop.expr.is<MapAccess>()) {
-      unop.addError() << "The " << opstr(unop)
-                      << " operator must be applied to a map or variable";
-    }
-  }
-
   visit(unop.expr);
-
-  const SizedType &type = unop.expr.type();
-  bool invalid = false;
-  // Unops are only allowed on ints (e.g. ~$x), dereference only on pointers
-  // and context (we allow args->field for backwards compatibility)
-  if (type.IsBoolTy()) {
-    invalid = unop.op != Operator::LNOT;
-  } else if (!type.IsIntegerTy() && !((type.IsPtrTy() || type.IsCtxAccess()) &&
-                                      IsValidPtrOp(unop.op))) {
-    invalid = true;
-  }
-  if (invalid) {
-    unop.addError() << "The " << opstr(unop)
-                    << " operator can not be used on expressions of type '"
-                    << type << "'";
-  }
 }
 
 void TypeChecker::visit(IfExpr &if_expr)

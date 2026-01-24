@@ -139,7 +139,7 @@ bool SizedType::IsCompatible(const SizedType &t) const
     return t.GetName() == GetName();
 
   if (IsPtrTy())
-    return GetPointeeTy().IsCompatible(t.GetPointeeTy());
+    return IsEqual(t);
 
   if (IsIntegerTy()) {
     if (IsSigned() == t.IsSigned()) {
@@ -640,13 +640,13 @@ ssize_t SizedType::GetInTupleAlignment() const
 
 bool SizedType::HasField(const std::string &name) const
 {
-  assert(IsCStructTy() || IsRecordTy());
+  assert(IsCStructTy() || IsRecordTy() || IsTupleTy());
   return inner_struct()->HasField(name);
 }
 
 const Field &SizedType::GetField(const std::string &name) const
 {
-  assert(IsCStructTy() || IsRecordTy());
+  assert(IsCStructTy() || IsRecordTy() || IsTupleTy());
   return inner_struct()->GetField(name);
 }
 
