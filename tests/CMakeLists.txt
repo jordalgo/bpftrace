@@ -13,6 +13,7 @@ add_executable(bpftrace_test
   child.cpp
   clang_parser.cpp
   named_param.cpp
+  cast_creator.cpp
   config.cpp
   collect_nodes.cpp
   control_flow_analyser.cpp
@@ -44,6 +45,7 @@ add_executable(bpftrace_test
   required_resources.cpp
   scopeguard.cpp
   type_checker.cpp
+  type_graph.cpp
   temp.cpp
   tracepoint_format_parser.cpp
   types.cpp

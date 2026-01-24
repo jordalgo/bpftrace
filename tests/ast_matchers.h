@@ -650,6 +650,21 @@ inline ProbeMatcher Probe(
       .WithPredicateAndBody(predicate, statements);
 }
 
+inline ProbeMatcher Probe(
+    const testing::Matcher<std::vector<std::string>>&,
+    const std::vector<Matcher<const ast::Statement&>>& statements)
+{
+  return ProbeMatcher().WithStatements(statements);
+}
+
+inline ProbeMatcher Probe(
+    const testing::Matcher<std::vector<std::string>>&,
+    const Matcher<const ast::Expression&>& predicate,
+    const std::vector<Matcher<const ast::Statement&>>& statements)
+{
+  return ProbeMatcher().WithPredicateAndBody(predicate, statements);
+}
+
 class IntegerMatcher : public NodeMatcher<IntegerMatcher, ast::Integer> {};
 
 inline IntegerMatcher Integer(uint64_t value)
@@ -703,7 +718,16 @@ inline CallMatcher Call(
   return CallMatcher().WithFunction(name).WithArgs(args);
 }
 
-class MapMatcher : public NodeMatcher<MapMatcher, ast::Map> {};
+class MapMatcher : public NodeMatcher<MapMatcher, ast::Map> {
+public:
+  MapMatcher& WithKeyType(
+      const Matcher<const class SizedType&>& type_matcher)
+  {
+    return Where([type_matcher](const ast::Map& node) {
+      return MatchWith(node, type_matcher, node.key_type);
+    });
+  }
+};
 
 inline MapMatcher Map(const std::string& ident)
 {
